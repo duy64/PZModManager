@@ -1,6 +1,7 @@
 PZ MOD MANAGER - FULL CHANGELOG
 Created by duy64. Licensed under the MIT License (see LICENSE.txt).
 
+v392: Fixed v391 startup crash (int + string concatenation in the new status text; now uses format strings).
 v391: Status bar no longer says 'Showing X of Y' when nothing is filtered (just '23 packs', '20 categories', etc.). The 'of' format only appears during a search.
 v390: Author credit changed from DN64 to duy64 across the app (script header, About dialog, README, LICENSE).
 v389: Last-column headers now use the NATIVE header template (pixel-perfect match, no more approximation drift). The resize gripper is disabled via a Loaded handler that collapses PART_HeaderGripper (Add-NoGripperHandler), instead of a custom template. Applied to main window + all dialogs.

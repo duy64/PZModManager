@@ -1,7 +1,7 @@
 # PZ Mod Manager - Created by duy64. Licensed under the MIT License (see LICENSE.txt).
 #Requires -Version 5.1
 <#
-  PZ Mod Manager v391 - B42 Essentials: mod pack for Single-Player & Multiplayer
+  PZ Mod Manager v392 - B42 Essentials: mod pack for Single-Player & Multiplayer
   Full collection (~190 mods) + Cheat Menu: Rebuild, no Steam client needed.
 #>
 $ErrorActionPreference = 'Stop'
@@ -17,7 +17,7 @@ $NL          = [Environment]::NewLine
 # Target game build. B43 = change these lines; the layout repair and [10] checks derive from them.
 $GameBuild = '42'      # major build: version folder name (42/)
 $GameBuildFull = '42.21'  # current full build: versionMax floor for [10] warnings
-$ScriptVersion = '391'    # app version: shown in the menu header + GUI title
+$ScriptVersion = '392'    # app version: shown in the menu header + GUI title
 
 # All known categories, including ones with zero mods right now (Maps /
 # Audio / Zombies have no catalog mods yet). The category editor lists
@@ -3700,19 +3700,19 @@ function Update-GuiStatusBar {
     if ($script:GuiPacksShown -ne $null) { $shown = $script:GuiPacksShown }
     $modsTotal = 0
     if ($script:GuiPacksTotalMods) { $modsTotal = $script:GuiPacksTotalMods }
-    if ($shown -eq $total) { $script:GuiStatusText.Text = ($total + ' packs | ' + $modsTotal + ' mods in packs') }
+    if ($shown -eq $total) { $script:GuiStatusText.Text = ('{0} packs | {1} mods in packs' -f $total, $modsTotal) }
     else { $script:GuiStatusText.Text = ('Showing ' + $shown + ' of ' + $total + ' packs | ' + $modsTotal + ' mods in packs') }
   } elseif ($idx -eq 2) {
     $shown = 0
     if ($script:GuiCategoriesShown -ne $null) { $shown = $script:GuiCategoriesShown }
-    if ($shown -eq $script:GuiCategoriesTotal) { $script:GuiStatusText.Text = ($script:GuiCategoriesTotal + ' categories') }
+    if ($shown -eq $script:GuiCategoriesTotal) { $script:GuiStatusText.Text = ('{0} categories' -f $script:GuiCategoriesTotal) }
     else { $script:GuiStatusText.Text = ('Showing ' + $shown + ' of ' + $script:GuiCategoriesTotal + ' categories') }
   } elseif ($idx -eq 3) {
     $total = 0
     if ($script:GuiListsTotal) { $total = $script:GuiListsTotal }
     $shown = 0
     if ($script:GuiListsShown -ne $null) { $shown = $script:GuiListsShown }
-    if ($shown -eq $total) { $script:GuiStatusText.Text = ($total + ' lists') }
+    if ($shown -eq $total) { $script:GuiStatusText.Text = ('{0} lists' -f $total) }
     else { $script:GuiStatusText.Text = ('Showing ' + $shown + ' of ' + $total + ' lists') }
   } else {
     $shown = 0
@@ -3721,7 +3721,7 @@ function Update-GuiStatusBar {
     if ($script:GuiModsInstalled -ne $null) { $installed = $script:GuiModsInstalled }
     $listName = 'No list'
     if ($script:GuiModsListName) { $listName = $script:GuiModsListName }
-    if ($shown -eq $Mods.Count) { $script:GuiStatusText.Text = ($Mods.Count + ' mods | ' + $installed + ' installed in this list | List: ' + $listName) }
+    if ($shown -eq $Mods.Count) { $script:GuiStatusText.Text = ('{0} mods | {1} installed in this list | List: {2}' -f $Mods.Count, $installed, $listName) }
     else { $script:GuiStatusText.Text = ('Showing ' + $shown + ' of ' + $Mods.Count + ' mods | ' + $installed + ' installed in this list | List: ' + $listName) }
   }
 }
