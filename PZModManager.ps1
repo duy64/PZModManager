@@ -1,7 +1,7 @@
 # PZ Mod Manager - Created by duy64. Licensed under the MIT License (see LICENSE.txt).
 #Requires -Version 5.1
 <#
-  PZ Mod Manager v392 - B42 Essentials: mod pack for Single-Player & Multiplayer
+  PZ Mod Manager v393 - B42 Essentials: mod pack for Single-Player & Multiplayer
   Full collection (~190 mods) + Cheat Menu: Rebuild, no Steam client needed.
 #>
 $ErrorActionPreference = 'Stop'
@@ -17,7 +17,7 @@ $NL          = [Environment]::NewLine
 # Target game build. B43 = change these lines; the layout repair and [10] checks derive from them.
 $GameBuild = '42'      # major build: version folder name (42/)
 $GameBuildFull = '42.21'  # current full build: versionMax floor for [10] warnings
-$ScriptVersion = '392'    # app version: shown in the menu header + GUI title
+$ScriptVersion = '393'    # app version: shown in the menu header + GUI title
 
 # All known categories, including ones with zero mods right now (Maps /
 # Audio / Zombies have no catalog mods yet). The category editor lists
@@ -6267,7 +6267,7 @@ function Show-Gui {
           </Grid.RowDefinitions>
           <ScrollViewer Grid.Row="0" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled" Margin="0,0,0,4">
           <StackPanel Orientation="Horizontal">
-            <TextBlock Text="Search:" VerticalAlignment="Center" Margin="0,0,6,0"/>
+            <TextBlock Text="Search:" VerticalAlignment="Center" Margin="0,0,6,0" Width="50"/>
             <TextBox x:Name="SearchBox" Width="260" Margin="0,0,12,0"/>
             <TextBlock Text="Filter by:" VerticalAlignment="Center" Margin="0,0,6,0"/>
             <ComboBox x:Name="CategoryBox" Width="170" Margin="0,0,12,0"/>
@@ -6276,7 +6276,7 @@ function Show-Gui {
           </ScrollViewer>
           <ScrollViewer Grid.Row="1" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled" Margin="0,0,0,8">
           <StackPanel Orientation="Horizontal">
-            <TextBlock Text="ID/URL:" VerticalAlignment="Center" Margin="0,0,6,0"/>
+            <TextBlock Text="ID/URL:" VerticalAlignment="Center" Margin="0,0,6,0" Width="50"/>
             <TextBox x:Name="ModAddIdBox" Width="160" Margin="0,0,6,0" VerticalContentAlignment="Center"/>
             <Button x:Name="ModAddButton" Content="Add Mods" Padding="10,4" Margin="0,0,12,0"/>
             <Button x:Name="ModSearchWorkshopButton" Content="Search Workshop" Padding="10,4" Margin="0,0,12,0"/>
