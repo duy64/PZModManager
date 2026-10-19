@@ -1,6 +1,7 @@
 PZ MOD MANAGER - FULL CHANGELOG
-Created by DN64. Licensed under the MIT License (see LICENSE.txt).
+Created by duy64. Licensed under the MIT License (see LICENSE.txt).
 
+v390: Author credit changed from DN64 to duy64 across the app (script header, About dialog, README, LICENSE).
 v389: Last-column headers now use the NATIVE header template (pixel-perfect match, no more approximation drift). The resize gripper is disabled via a Loaded handler that collapses PART_HeaderGripper (Add-NoGripperHandler), instead of a custom template. Applied to main window + all dialogs.
 v388: Last-column headers: blue-tinted gradient + border to match the native Windows 11 header tone (was neutral gray, still visibly flatter).
 v387: Last-column headers now match the 3D raised look of the rest: subtle white-to-light-gray vertical gradient (was flat White, still looked slightly off vs the default headers' depth).

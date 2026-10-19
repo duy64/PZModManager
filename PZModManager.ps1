@@ -1,7 +1,7 @@
-# PZ Mod Manager - Created by DN64. Licensed under the MIT License (see LICENSE.txt).
+# PZ Mod Manager - Created by duy64. Licensed under the MIT License (see LICENSE.txt).
 #Requires -Version 5.1
 <#
-  PZ Mod Manager v389 - B42 Essentials: mod pack for Single-Player & Multiplayer
+  PZ Mod Manager v390 - B42 Essentials: mod pack for Single-Player & Multiplayer
   Full collection (~190 mods) + Cheat Menu: Rebuild, no Steam client needed.
 #>
 $ErrorActionPreference = 'Stop'
@@ -17,7 +17,7 @@ $NL          = [Environment]::NewLine
 # Target game build. B43 = change these lines; the layout repair and [10] checks derive from them.
 $GameBuild = '42'      # major build: version folder name (42/)
 $GameBuildFull = '42.21'  # current full build: versionMax floor for [10] warnings
-$ScriptVersion = '389'    # app version: shown in the menu header + GUI title
+$ScriptVersion = '390'    # app version: shown in the menu header + GUI title
 
 # All known categories, including ones with zero mods right now (Maps /
 # Audio / Zombies have no catalog mods yet). The category editor lists
@@ -6171,7 +6171,7 @@ function Show-GuiAboutDialog {
     </Grid.RowDefinitions>
     <TextBlock Grid.Row="0" Text="PZ Mod Manager" FontSize="20" FontWeight="Bold" Margin="0,0,0,4"/>
     <TextBlock Grid.Row="1" x:Name="AboutVersion" Margin="0,0,0,12"/>
-    <TextBlock Grid.Row="2" Text="Created by DN64." Margin="0,0,0,4"/>
+    <TextBlock Grid.Row="2" Text="Created by duy64." Margin="0,0,0,4"/>
     <TextBlock Grid.Row="3" Text="Licensed under the MIT License." Margin="0,0,0,12"/>
     <TextBlock Grid.Row="4" Text="Unofficial fan tool. Not affiliated with Steam, Valve, or The Indie Stone." TextWrapping="Wrap"/>
     <Button Grid.Row="5" x:Name="AboutClose" Content="Close" Width="90" HorizontalAlignment="Right" Padding="10,4"/>

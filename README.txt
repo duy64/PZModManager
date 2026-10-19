@@ -1,5 +1,5 @@
-PZ MOD MANAGER v389
-Created by DN64. Licensed under the MIT License (see LICENSE.txt).
+PZ MOD MANAGER v390
+Created by duy64. Licensed under the MIT License (see LICENSE.txt).
 
 WHAT IT IS
   A PowerShell GUI mod manager for Project Zomboid Build 42.21. Add, install, and manage mods, packs, categories, and full mod-list profiles. No Steam client needed (uses SteamCMD).
@@ -16,6 +16,6 @@ FEATURES
   - Mods / Packs / Categories / Lists tabs. Lists are full profiles (mods + packs + categories).
   - Tools menu: Check For Mod Updates, Compatibility Report, Manage Variants, Add Existing Mods, View Mod's Page, Workshop Home Page, Clear Cache, About.
   - Workshop ID validation on Add. Safeguard prompt before every destructive action.
-  - Built-in catalog: 219 B42 mods in 12 categories - DN64's curated list. Add or remove mods to make it yours.
+  - Built-in catalog: 219 B42 mods in 12 categories - duy64's curated list. Add or remove mods to make it yours.
 
 Full version history in CHANGELOG.txt.
