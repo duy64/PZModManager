@@ -1,7 +1,7 @@
 # PZ Mod Manager - Created by duy64. Licensed under the MIT License (see LICENSE.txt).
 #Requires -Version 5.1
 <#
-  PZ Mod Manager v404 - B42 Essentials: mod pack for Single-Player & Multiplayer
+  PZ Mod Manager v405 - B42 Essentials: mod pack for Single-Player & Multiplayer
   Full collection (~190 mods) + Cheat Menu: Rebuild, no Steam client needed.
 #>
 $ErrorActionPreference = 'Stop'
@@ -17,7 +17,7 @@ $NL          = [Environment]::NewLine
 # Target game build. B43 = change these lines; the layout repair and [10] checks derive from them.
 $GameBuild = '42'      # major build: version folder name (42/)
 $GameBuildFull = '42.21'  # current full build: versionMax floor for [10] warnings
-$ScriptVersion = '404'    # app version: shown in the menu header + GUI title
+$ScriptVersion = '405'    # app version: shown in the menu header + GUI title
 
 # All known categories, including ones with zero mods right now (Maps /
 # Audio / Zombies have no catalog mods yet). The category editor lists
@@ -702,12 +702,9 @@ function Get-WorkshopStats($ids) {
         $d = $r.Content | ConvertFrom-Json
         foreach ($item in @($d.response.publishedfiledetails)) {
           $wid = [string]$item.publishedfileid
-          $subs = 0; $score = 0; $up = 0; $down = 0
+          $subs = 0
           try { $subs = [long]$item.subscriptions } catch { }
-          try { $score = [double]$item.vote_data.score } catch { }
-          try { $up = [long]$item.vote_data.votes_up } catch { }
-          try { $down = [long]$item.vote_data.votes_down } catch { }
-          $script:WorkshopStats[$wid] = [PSCustomObject]@{ Subscribers = $subs; Score = $score; VotesUp = $up; VotesDown = $down }
+          $script:WorkshopStats[$wid] = [PSCustomObject]@{ Subscribers = $subs; Score = [double]0; VotesUp = [long]0; VotesDown = [long]0 }
         }
       } catch { }
     }
@@ -4381,13 +4378,13 @@ function Refresh-GuiPacks {
     # Header sort indicators.
     if ($script:GuiPackList.View -and $script:GuiPackList.View.Columns) {
       $gvCols = $script:GuiPackList.View.Columns
-      $plain = @('Name', 'Description', 'Mods', 'Created Date', 'Installed')
+      $plain = @('Name', 'Mods', 'Created Date', 'Installed', 'Description')
       for ($i = 0; $i -lt 5 -and ($i + 1) -lt $gvCols.Count; $i++) { $gvCols[$i + 1].Header = $plain[$i] }
       if ($col -eq 'Name') { $gvCols[1].Header = if ($script:GuiPacksSortDescending) { 'Name (Z-A)' } else { 'Name (A-Z)' } }
-      elseif ($col -eq 'Description') { $gvCols[2].Header = if ($script:GuiPacksSortDescending) { 'Description (Z-A)' } else { 'Description (A-Z)' } }
-      elseif ($col -eq 'Mods') { $gvCols[3].Header = if ($script:GuiPacksSortDescending) { 'Mods (9-0)' } else { 'Mods (0-9)' } }
-      elseif ($col -eq 'Date') { $gvCols[4].Header = if ($script:GuiPacksSortDescending) { 'Created Date (newest)' } else { 'Created Date (oldest)' } }
-      elseif ($col -eq 'Installed') { $gvCols[5].Header = if ($script:GuiPacksSortDescending) { 'Installed (9-0)' } else { 'Installed (0-9)' } }
+      elseif ($col -eq 'Mods') { $gvCols[2].Header = if ($script:GuiPacksSortDescending) { 'Mods (9-0)' } else { 'Mods (0-9)' } }
+      elseif ($col -eq 'Date') { $gvCols[3].Header = if ($script:GuiPacksSortDescending) { 'Created Date (newest)' } else { 'Created Date (oldest)' } }
+      elseif ($col -eq 'Installed') { $gvCols[4].Header = if ($script:GuiPacksSortDescending) { 'Installed (9-0)' } else { 'Installed (0-9)' } }
+      elseif ($col -eq 'Description') { $gvCols[5].Header = if ($script:GuiPacksSortDescending) { 'Description (Z-A)' } else { 'Description (A-Z)' } }
     }
     # Detail pane: members of the detail pack (first shown pack by default,
     # or the pack the user clicked). The detail pack survives refreshes.
@@ -6426,10 +6423,10 @@ function Show-Gui {
                   </GridViewColumn.CellTemplate>
                 </GridViewColumn>
                 <GridViewColumn Header="Name" Width="280" DisplayMemberBinding="{Binding Name}"/>
-                <GridViewColumn Header="Description" Width="350" DisplayMemberBinding="{Binding Description}"/>
                 <GridViewColumn Header="Mods" Width="120" DisplayMemberBinding="{Binding Mods}"/>
                 <GridViewColumn Header="Created Date" Width="180" DisplayMemberBinding="{Binding Date}"/>
-                <GridViewColumn HeaderContainerStyle="{StaticResource NoGripperHeader}" Header="Installed" Width="110" DisplayMemberBinding="{Binding Installed}"/>
+                <GridViewColumn Header="Installed" Width="110" DisplayMemberBinding="{Binding Installed}"/>
+                <GridViewColumn HeaderContainerStyle="{StaticResource NoGripperHeader}" Header="Description" Width="200" DisplayMemberBinding="{Binding Description}"/>
               </GridView>
             </ListView.View>
           </ListView>
@@ -6718,9 +6715,10 @@ function Show-Gui {
           $idx = $script:GuiPackList.View.Columns.IndexOf($col)
           $sortCol = $null
           if ($idx -eq 1) { $sortCol = 'Name' }
-          elseif ($idx -eq 2) { $sortCol = 'Description' }
-          elseif ($idx -eq 3) { $sortCol = 'Mods' }
+          elseif ($idx -eq 2) { $sortCol = 'Mods' }
+          elseif ($idx -eq 3) { $sortCol = 'Date' }
           elseif ($idx -eq 4) { $sortCol = 'Installed' }
+          elseif ($idx -eq 5) { $sortCol = 'Description' }
           if ($sortCol) { Cycle-GuiPacksSort $sortCol }
         }
       }
