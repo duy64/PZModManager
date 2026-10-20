@@ -1,7 +1,7 @@
 # PZ Mod Manager - Created by duy64. Licensed under the MIT License (see LICENSE.txt).
 #Requires -Version 5.1
 <#
-  PZ Mod Manager v406 - B42 Essentials: mod pack for Single-Player & Multiplayer
+  PZ Mod Manager v407 - B42 Essentials: mod pack for Single-Player & Multiplayer
   Full collection (~190 mods) + Cheat Menu: Rebuild, no Steam client needed.
 #>
 $ErrorActionPreference = 'Stop'
@@ -17,7 +17,7 @@ $NL          = [Environment]::NewLine
 # Target game build. B43 = change these lines; the layout repair and [10] checks derive from them.
 $GameBuild = '42'      # major build: version folder name (42/)
 $GameBuildFull = '42.21'  # current full build: versionMax floor for [10] warnings
-$ScriptVersion = '406'    # app version: shown in the menu header + GUI title
+$ScriptVersion = '407'    # app version: shown in the menu header + GUI title
 
 # All known categories, including ones with zero mods right now (Maps /
 # Audio / Zombies have no catalog mods yet). The category editor lists
@@ -3875,6 +3875,29 @@ function Toggle-GuiSelectAllPacks {
   $script:GuiPackSelectionDirty = $true
   Refresh-GuiPacks
 }
+function Sort-GuiPackMemberRows($rows) {
+  $list = @($rows)
+  if ($list.Count -le 1) { return ,$list }
+  $col = $script:GuiPackMembersSortColumn; $desc = $script:GuiPackMembersSortDescending
+  if ($col -eq 'Name') { if ($desc) { return @($list | Sort-Object Name -Descending) } else { return @($list | Sort-Object Name) } }
+  if ($col -eq 'Category') { if ($desc) { return @($list | Sort-Object Category, Name -Descending) } else { return @($list | Sort-Object Category, Name) } }
+  if ($col -eq 'Status') { if ($desc) { return @($list | Sort-Object Status, Name -Descending) } else { return @($list | Sort-Object Status, Name) } }
+  if ($col -eq 'Subscribers') { if ($desc) { return @($list | Sort-Object { [long]$_.Subscribers }, Name -Descending) } else { return @($list | Sort-Object { [long]$_.Subscribers }, Name) } }
+  if ($col -eq 'Rating') { if ($desc) { return @($list | Sort-Object { [int]$_.Stars }, Name -Descending) } else { return @($list | Sort-Object { [int]$_.Stars }, Name) } }
+  if ($col -eq 'WorkshopId') { if ($desc) { return @($list | Sort-Object { [long]$_.WorkshopId }, Name -Descending) } else { return @($list | Sort-Object { [long]$_.WorkshopId }, Name) } }
+  return ,$list
+}
+function Cycle-GuiPackMembersSort([string]$col) {
+  if ($script:GuiPackMembersSortColumn -eq $col) {
+    $script:GuiPackMembersSortDescending = -not $script:GuiPackMembersSortDescending
+  } else { $script:GuiPackMembersSortColumn = $col; $script:GuiPackMembersSortDescending = $false }
+  # Re-render the current detail pack with the new sort (keeps the pack).
+  $dn = [string]$script:GuiPackDetailName
+  $dp = $null
+  if ($dn -ne '') { $dp = @(Get-AllPacks | Where-Object { $_.Name -eq $dn })[0] }
+  Refresh-GuiPackDetail $dp
+}
+
 function Toggle-GuiSelectAllLists {
   # Header checkbox on the Lists table: select all shown named lists or clear.
   if (-not $script:GuiSelectedLists) { $script:GuiSelectedLists = @{} }
@@ -4513,18 +4536,34 @@ function Refresh-GuiPackDetail($pack) {
     $isInstalled = $installed -contains [string]$m.WorkshopId
     $pwid = [string]$m.WorkshopId
     $psubs = [long]0; $prate = ''
-    if ($pStats -and $pStats.ContainsKey($pwid)) { $psubs = [long]$pStats[$pwid].Subscribers; $prate = Format-Stars ([int]$pStats[$pwid].Stars) }
+    $pstars = 0
+    if ($pStats -and $pStats.ContainsKey($pwid)) { $psubs = [long]$pStats[$pwid].Subscribers; $pstars = [int]$pStats[$pwid].Stars; $prate = Format-Stars $pstars }
     $items += [PSCustomObject]@{
       Name = [string]$m.Name
       Category = [string]$m.Cat
       Status = if ($isInstalled) { 'Installed' } else { 'Not installed' }
       Subscribers = $psubs
       Rating = $prate
+      Stars = [int]$pstars
       WorkshopId = $pwid
       IsChecked = $script:GuiSelectedMods.ContainsKey($pwid)
     }
   }
+  $items = Sort-GuiPackMemberRows $items
   $script:GuiPackMemberList.ItemsSource = $items
+  # Header sort indicators.
+  if ($script:GuiPackMemberList.View -and $script:GuiPackMemberList.View.Columns) {
+    $mpvCols = $script:GuiPackMemberList.View.Columns
+    $mpl = @('Name', 'Category', 'Status', 'Subscribers', 'Rating', 'Workshop ID')
+    for ($i = 0; $i -lt 6 -and ($i + 1) -lt $mpvCols.Count; $i++) { $mpvCols[$i + 1].Header = $mpl[$i] }
+    $mc = $script:GuiPackMembersSortColumn; $md = $script:GuiPackMembersSortDescending
+    if ($mc -eq 'Name') { $mpvCols[1].Header = if ($md) { 'Name (Z-A)' } else { 'Name (A-Z)' } }
+    elseif ($mc -eq 'Category') { $mpvCols[2].Header = if ($md) { 'Category (Z-A)' } else { 'Category (A-Z)' } }
+    elseif ($mc -eq 'Status') { $mpvCols[3].Header = if ($md) { 'Status (Not installed first)' } else { 'Status (Installed first)' } }
+    elseif ($mc -eq 'Subscribers') { $mpvCols[4].Header = if ($md) { 'Subscribers (9-0)' } else { 'Subscribers (0-9)' } }
+    elseif ($mc -eq 'Rating') { $mpvCols[5].Header = if ($md) { 'Rating (5-0)' } else { 'Rating (0-5)' } }
+    elseif ($mc -eq 'WorkshopId') { $mpvCols[6].Header = if ($md) { 'Workshop ID (9-0)' } else { 'Workshop ID (0-9)' } }
+  }
   # Detail header select-all checkbox.
   if ($script:GuiPackMemberList.View -and $script:GuiPackMemberList.View.Columns -and $script:GuiPackMemberList.View.Columns.Count -gt 0) {
     $hdrCb = $script:GuiPackMemberList.View.Columns[0].Header
@@ -6849,6 +6888,23 @@ function Show-Gui {
             $script:GuiSelectionDirty = $true
             Update-GuiPackSelectionButtons
           }
+        }
+      }
+    })
+    $script:GuiPackMemberList.AddHandler([System.Windows.Controls.GridViewColumnHeader]::ClickEvent, [System.Windows.RoutedEventHandler]{
+      $src = $args[1].OriginalSource
+      if ($src -is [System.Windows.Controls.GridViewColumnHeader]) {
+        $col = $src.Column
+        if ($col -and $script:GuiPackMemberList.View) {
+          $idx = $script:GuiPackMemberList.View.Columns.IndexOf($col)
+          $sortCol = $null
+          if ($idx -eq 1) { $sortCol = 'Name' }
+          elseif ($idx -eq 2) { $sortCol = 'Category' }
+          elseif ($idx -eq 3) { $sortCol = 'Status' }
+          elseif ($idx -eq 4) { $sortCol = 'Subscribers' }
+          elseif ($idx -eq 5) { $sortCol = 'Rating' }
+          elseif ($idx -eq 6) { $sortCol = 'WorkshopId' }
+          if ($sortCol) { Cycle-GuiPackMembersSort $sortCol }
         }
       }
     })
