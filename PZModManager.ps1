@@ -1,7 +1,7 @@
 # PZ Mod Manager - Created by duy64. Licensed under the MIT License (see LICENSE.txt).
 #Requires -Version 5.1
 <#
-  PZ Mod Manager v419 - B42 Essentials: mod pack for Single-Player & Multiplayer
+  PZ Mod Manager v420 - B42 Essentials: mod pack for Single-Player & Multiplayer
   Full collection (~190 mods) + Cheat Menu: Rebuild, no Steam client needed.
 #>
 $ErrorActionPreference = 'Stop'
@@ -17,7 +17,7 @@ $NL          = [Environment]::NewLine
 # Target game build. B43 = change these lines; the layout repair and [10] checks derive from them.
 $GameBuild = '42'      # major build: version folder name (42/)
 $GameBuildFull = '42.21'  # current full build: versionMax floor for [10] warnings
-$ScriptVersion = '419'    # app version: shown in the menu header + GUI title
+$ScriptVersion = '420'    # app version: shown in the menu header + GUI title
 
 # All known categories, including ones with zero mods right now (Maps /
 # Audio / Zombies have no catalog mods yet). The category editor lists
@@ -2855,8 +2855,6 @@ function Show-GuiWpfPicker([string]$title, [string]$instruction, $candidates, $c
       </ScrollViewer>
     </Border>
     <StackPanel Grid.Row="4" Orientation="Horizontal" Margin="0,8,0,0">
-      <Button x:Name="PickerSelectAll" Content="Select All" Padding="12,4" Margin="0,0,8,0"/>
-      <Button x:Name="PickerClear" Content="Deselect All" Padding="12,4" Margin="0,0,8,0"/>
       <Button x:Name="PickerWorkshop" Content="View Mod's Page" Padding="12,4" Margin="0,0,8,0"/>
       <Button x:Name="PickerAdd" Padding="12,4" Margin="390,0,8,0"/>
       <Button x:Name="PickerCancel" Content="Cancel" Padding="12,4" Margin="0,0,8,0"/>
@@ -2881,6 +2879,13 @@ function Show-GuiWpfPicker([string]$title, [string]$instruction, $candidates, $c
     $checkTpl = [System.Windows.Markup.XamlReader]::Parse('<DataTemplate xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"><CheckBox IsChecked="{Binding IsChecked}" HorizontalAlignment="Center" VerticalAlignment="Center"/></DataTemplate>')
     Build-StandardGridColumns $gridView $columns $checkTpl $window.FindResource('NoGripperHeader')
     Register-LastColumnFill $listView
+    # Standard (same as the main tabs): header Select All checkbox in
+    # the checkbox column + selection-gated Add button with a count.
+    $hdrCheck = New-Object System.Windows.Controls.CheckBox
+    $hdrCheck.Tag = 'SelectAll'
+    $hdrCheck.HorizontalAlignment = [System.Windows.HorizontalAlignment]::Center
+    $hdrCheck.VerticalAlignment = [System.Windows.VerticalAlignment]::Center
+    $gridView.Columns[0].Header = $hdrCheck
     $state = @{ SortProp = ''; SortDesc = $false; Query = '' }
     $refresh = {
       $shown = @($rows)
@@ -2897,6 +2902,8 @@ function Show-GuiWpfPicker([string]$title, [string]$instruction, $candidates, $c
       # a non-numeric Mod ID, opens the PZ Workshop main page).
       $nChecked = @($rows | Where-Object { [bool]$_.IsChecked }).Count
       $window.FindName('PickerAdd').IsEnabled = ($nChecked -gt 0)
+      $window.FindName('PickerAdd').Content = ($addButtonText + ' (' + $nChecked + ')')
+      $hdrCheck.IsChecked = (@($rows).Count -gt 0 -and $nChecked -eq @($rows).Count)
       # Standard: View this mod on Workshop needs a highlighted row
       # with a numeric Workshop ID whose Name is not just the ID.
       $selRow = $listView.SelectedItem
@@ -2909,7 +2916,11 @@ function Show-GuiWpfPicker([string]$title, [string]$instruction, $candidates, $c
     $listView.AddHandler([System.Windows.Controls.Primitives.ButtonBase]::ClickEvent, [System.Windows.RoutedEventHandler]{
       param($sender, $e)
       $cb = $e.OriginalSource -as [System.Windows.Controls.CheckBox]
-      if ($cb -and $cb.DataContext) { $cb.DataContext.IsChecked = [bool]$cb.IsChecked }
+      if ($cb -and [string]$cb.Tag -eq 'SelectAll') {
+        $allChecked = (@($rows).Count -gt 0 -and @($rows | Where-Object { [bool]$_.IsChecked }).Count -eq @($rows).Count)
+        foreach ($r in $rows) { $r.IsChecked = (-not $allChecked) }
+        & $refresh
+      } elseif ($cb -and $cb.DataContext) { $cb.DataContext.IsChecked = [bool]$cb.IsChecked; & $refresh }
     })
     # Row click: show the selected row's full Details in the detail pane
     # below (the Details column clips long text and the tooltip
@@ -2941,8 +2952,6 @@ function Show-GuiWpfPicker([string]$title, [string]$instruction, $candidates, $c
       }
     })
     $window.FindName('PickerSearchBox').Add_TextChanged({ $state.Query = [string]$window.FindName('PickerSearchBox').Text; & $refresh })
-    $window.FindName('PickerSelectAll').Add_Click({ foreach ($r in $rows) { $r.IsChecked = $true }; & $refresh })
-    $window.FindName('PickerClear').Add_Click({ foreach ($r in $rows) { $r.IsChecked = $false }; & $refresh })
     $result = @{ Selected = $null }
     $cancelAllBtn = $window.FindName('PickerCancelAll')
     if ($ShowCancelAll) { $cancelAllBtn.Visibility = [System.Windows.Visibility]::Visible }
@@ -5254,10 +5263,8 @@ function Show-GuiWorkshopSearch {
       <ListView.View><GridView x:Name="SearchGridView" AllowsColumnReorder="False"/></ListView.View>
     </ListView>
     <StackPanel Grid.Row="3" Orientation="Horizontal" Margin="0,8,0,0">
-      <Button x:Name="SearchSelectAll" Content="Select All" Padding="12,4" Margin="0,0,8,0"/>
-      <Button x:Name="SearchClear" Content="Deselect All" Padding="12,4" Margin="0,0,8,0"/>
       <Button x:Name="SearchWorkshop" Content="View Mod's Page" Padding="12,4" Margin="0,0,8,0"/>
-      <Button x:Name="SearchAdd" Content="Add Selected" Padding="12,4" Margin="390,0,8,0"/>
+      <Button x:Name="SearchAdd" Content="Add Selected (0)" Padding="12,4" Margin="590,0,8,0" IsEnabled="False"/>
       <Button x:Name="SearchCancel" Content="Cancel" Padding="12,4"/>
     </StackPanel>
   </Grid>
@@ -5276,6 +5283,13 @@ function Show-GuiWorkshopSearch {
       @{ Header = 'Workshop ID'; Property = 'WorkshopId'; Width = 280 }
     ) $checkTpl $window.FindResource('NoGripperHeader')
     Register-LastColumnFill $listView
+    # Standard (same as the main tabs): header Select All checkbox +
+    # selection-gated Add Selected button with a count.
+    $hdrCheck = New-Object System.Windows.Controls.CheckBox
+    $hdrCheck.Tag = 'SelectAll'
+    $hdrCheck.HorizontalAlignment = [System.Windows.HorizontalAlignment]::Center
+    $hdrCheck.VerticalAlignment = [System.Windows.VerticalAlignment]::Center
+    $gridView.Columns[0].Header = $hdrCheck
     $state = @{ Rows = @(); SortProp = ''; SortDesc = $false }
     $refresh = {
       $shown = @($state.Rows)
@@ -5283,11 +5297,19 @@ function Show-GuiWorkshopSearch {
         if ($state.SortDesc) { $shown = @($shown | Sort-Object $state.SortProp -Descending) } else { $shown = @($shown | Sort-Object $state.SortProp) }
       }
       $listView.ItemsSource = $shown
+      $nChecked = @($state.Rows | Where-Object { [bool]$_.IsChecked }).Count
+      $window.FindName('SearchAdd').IsEnabled = ($nChecked -gt 0)
+      $window.FindName('SearchAdd').Content = ('Add Selected (' + $nChecked + ')')
+      $hdrCheck.IsChecked = (@($state.Rows).Count -gt 0 -and $nChecked -eq @($state.Rows).Count)
     }
     $listView.AddHandler([System.Windows.Controls.Primitives.ButtonBase]::ClickEvent, [System.Windows.RoutedEventHandler]{
       param($sender, $e)
       $cb = $e.OriginalSource -as [System.Windows.Controls.CheckBox]
-      if ($cb -and $cb.DataContext) { $cb.DataContext.IsChecked = [bool]$cb.IsChecked }
+      if ($cb -and [string]$cb.Tag -eq 'SelectAll') {
+        $allChecked = (@($state.Rows).Count -gt 0 -and @($state.Rows | Where-Object { [bool]$_.IsChecked }).Count -eq @($state.Rows).Count)
+        foreach ($r in $state.Rows) { $r.IsChecked = (-not $allChecked) }
+        & $refresh
+      } elseif ($cb -and $cb.DataContext) { $cb.DataContext.IsChecked = [bool]$cb.IsChecked; & $refresh }
     })
     $listView.AddHandler([System.Windows.Controls.GridViewColumnHeader]::ClickEvent, [System.Windows.RoutedEventHandler]{
       param($sender, $e)
@@ -5343,8 +5365,6 @@ function Show-GuiWorkshopSearch {
     }
     $window.FindName('SearchBrowsePopular').Add_Click($doBrowsePopular)
     $window.FindName('SearchBox').Add_KeyDown({ param($s2, $e2); if ($e2.Key -eq [System.Windows.Input.Key]::Enter) { & $doSearch } })
-    $window.FindName('SearchSelectAll').Add_Click({ foreach ($r in $state.Rows) { $r.IsChecked = $true }; & $refresh })
-    $window.FindName('SearchClear').Add_Click({ foreach ($r in $state.Rows) { $r.IsChecked = $false }; & $refresh })
     $result = @{ Selected = $null }
     $window.FindName('SearchAdd').Add_Click({
       $sel = @()
