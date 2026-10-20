@@ -1,7 +1,7 @@
 # PZ Mod Manager - Created by duy64. Licensed under the MIT License (see LICENSE.txt).
 #Requires -Version 5.1
 <#
-  PZ Mod Manager v415 - B42 Essentials: mod pack for Single-Player & Multiplayer
+  PZ Mod Manager v416 - B42 Essentials: mod pack for Single-Player & Multiplayer
   Full collection (~190 mods) + Cheat Menu: Rebuild, no Steam client needed.
 #>
 $ErrorActionPreference = 'Stop'
@@ -17,7 +17,7 @@ $NL          = [Environment]::NewLine
 # Target game build. B43 = change these lines; the layout repair and [10] checks derive from them.
 $GameBuild = '42'      # major build: version folder name (42/)
 $GameBuildFull = '42.21'  # current full build: versionMax floor for [10] warnings
-$ScriptVersion = '415'    # app version: shown in the menu header + GUI title
+$ScriptVersion = '416'    # app version: shown in the menu header + GUI title
 
 # All known categories, including ones with zero mods right now (Maps /
 # Audio / Zombies have no catalog mods yet). The category editor lists
@@ -474,7 +474,7 @@ function Get-NamedListData([string]$safe) {
   try { return (Get-Content $f -Raw -ErrorAction Stop | ConvertFrom-Json) } catch { return $null }
 }
 
-function Save-NamedListData([string]$safe, [string]$name, $mods, $packs = $null, $categories = $null, $tracksCatalog = $null) {
+function Save-NamedListData([string]$safe, [string]$name, $mods, $packs = $null, $categories = $null, $tracksCatalog = $null, $removedPacks = $null) {
   # A list is its mods + packs + categories:
   # { name, created, mods: [{workshopId,name,cat}],
   #   packs: [{name,desc,ids,source}], categories: [extra empty names] }.
@@ -494,7 +494,13 @@ function Save-NamedListData([string]$safe, [string]$name, $mods, $packs = $null,
     # Default is created with $true.
     if ($old -and $old.PSObject.Properties['tracksCatalog']) { $tracksCatalog = [bool]$old.tracksCatalog } else { $tracksCatalog = $false }
   }
-  $obj = [PSCustomObject]@{ name = [string]$name; created = $created; mods = @($mods | Where-Object { $_ -ne $null -and [string]$_.workshopId -ne '' } | ForEach-Object { [PSCustomObject]@{ workshopId = [string]$_.workshopId; name = [string]$_.name; cat = [string]$_.cat; autoDep = [bool]$_.autoDep } }); packs = $packObjs; categories = $catNames; tracksCatalog = [bool]$tracksCatalog }
+  if ($null -eq $removedPacks) {
+    # Preserve the removed built-in pack names (rename/delete of a
+    # built-in pack is per-list); a brand-new list starts empty.
+    if ($old -and $old.PSObject.Properties['removedPacks']) { $removedPacks = @($old.removedPacks) } else { $removedPacks = @() }
+  }
+  $removedNames = @($removedPacks | ForEach-Object { ([string]$_).Trim() } | Where-Object { $_ -ne '' } | Sort-Object -Unique)
+  $obj = [PSCustomObject]@{ name = [string]$name; created = $created; mods = @($mods | Where-Object { $_ -ne $null -and [string]$_.workshopId -ne '' } | ForEach-Object { [PSCustomObject]@{ workshopId = [string]$_.workshopId; name = [string]$_.name; cat = [string]$_.cat; autoDep = [bool]$_.autoDep } }); packs = $packObjs; categories = $catNames; tracksCatalog = [bool]$tracksCatalog; removedPacks = $removedNames }
   $f = Join-Path $ListsDir ([string]$safe + '.json')
   $obj | ConvertTo-Json -Depth 5 | Set-Content $f -Encoding UTF8
 }
@@ -533,6 +539,31 @@ function Get-CustomPacks {
     } catch { }
   }
   return $out
+}
+
+function Get-RemovedPackNames([string]$safe) {
+  # Names of built-in packs deleted or renamed away in a list.
+  if ([string]$safe -eq '') { return @() }
+  $d = Get-NamedListData $safe
+  if (-not $d -or -not $d.PSObject.Properties['removedPacks']) { return @() }
+  return @(@($d.removedPacks) | ForEach-Object { [string]$_ } | Where-Object { $_ -ne '' })
+}
+
+function Set-RemovedPackNames([string]$safe, $names) {
+  if ([string]$safe -eq '') { return }
+  $d = Get-NamedListData $safe
+  if (-not $d) { return }
+  Save-NamedListData $safe ([string]$d.name) @($d.mods) @($d.packs) @($d.categories) $null @($names)
+}
+
+function Add-RemovedPackName([string]$safe, [string]$packName) {
+  $names = @(Get-RemovedPackNames $safe)
+  if ($names -notcontains $packName) { $names += $packName; Set-RemovedPackNames $safe $names }
+}
+
+function Remove-RemovedPackName([string]$safe, [string]$packName) {
+  $names = @(Get-RemovedPackNames $safe)
+  if ($names -contains $packName) { Set-RemovedPackNames $safe @($names | Where-Object { $_ -ne $packName }) }
 }
 
 function Save-CustomPacks($packs) {
@@ -579,12 +610,21 @@ function Get-AllPacks([switch]$AllLists) {
     if ($AllLists) { $customNames += [string]$cp0.Name }
     elseif ([string]$cp0.List -eq $activeList) { $customNames += [string]$cp0.Name }
   }
+  # Built-in packs deleted or renamed away in the active list are
+  # hidden there (per-list removedPacks in the list file). Global
+  # lookups (-AllLists) ignore the tombstones.
+  $removedBuiltins = @()
+  if (-not $AllLists -and $activeList -ne '') {
+    $ld = Get-NamedListData $activeList
+    if ($ld -and $ld.PSObject.Properties['removedPacks']) { $removedBuiltins = @($ld.removedPacks | ForEach-Object { [string]$_ }) }
+  }
   foreach ($p in $Packs) {
     # Built-in packs belong to NO list (List = ''): they show in
     # every list. A custom pack in the active list shadows the
     # built-in of the same name (Edit on a built-in converts it to
     # an editable custom pack of the same name).
     if ($customNames -contains [string]$p.Name) { continue }
+    if ($removedBuiltins -contains [string]$p.Name) { continue }
     # PSCustomObject, NOT a hashtable: Sort-Object by property name
     # does not resolve hashtable keys in Windows PowerShell 5.1, so
     # the Packs tab Name/Desc sort silently did nothing (same class
@@ -3521,7 +3561,7 @@ function Update-GuiCategorySelectionButtons {
   # requirement is met. Delete needs a checked category.
   $nc = 0
   if ($script:GuiSelectedCategories) { $nc = $script:GuiSelectedCategories.Count }
-  if ($script:GuiDeleteSelectedCategoriesButton) { $script:GuiDeleteSelectedCategoriesButton.IsEnabled = ($nc -gt 0) }
+  if ($script:GuiCategoryRenameDeleteButton) { $script:GuiCategoryRenameDeleteButton.IsEnabled = ($nc -gt 0) }
   Sync-GuiHeaderCheckbox $script:GuiCategoryListView 'SelectAllCategories' $script:GuiCategoriesShownNames $script:GuiSelectedCategories
 }
 
@@ -3619,6 +3659,46 @@ function Refresh-GuiCategoriesTab {
 
   Update-GuiCategorySelectionButtons
   Sync-GuiHeaderCheckbox $script:GuiCategoryListView 'SelectAllCategories' $script:GuiCategoriesShownNames $script:GuiSelectedCategories
+}
+
+function Rename-GuiCategory([string]$oldName) {
+  # Rename a category in the active list: every mod in it moves to
+  # the new name (same machinery as Move To Category), the list's
+  # stored category names follow, and pack CAT: references follow -
+  # built-in packs fed by the old name get a custom copy carrying
+  # the new reference so they keep their members.
+  if ($oldName -eq 'Others') { Set-GuiTransientStatus ('Others cannot be renamed (it is the fallback).'); return }
+  $newName = Read-GuiInput 'New name for the category' 'PZ Mod Manager' $oldName
+  if (-not $newName -or $newName -eq $oldName) { return }
+  if (@(Get-AllCategoryNames) -contains $newName) { Set-GuiTransientStatus (("A category named '" + $newName + "' already exists.")); return }
+  $moved = Move-CategoryMods $oldName $newName
+  $customNames = @(Get-CustomCategoryNames)
+  if ($customNames -contains $oldName) { Remove-CustomCategoryName $oldName; Add-CustomCategoryName $newName }
+  elseif ($moved -eq 0) { Add-CustomCategoryName $newName }
+  $activeList = Get-ActiveListSafe
+  $customPacks = @(Get-CustomPacks)
+  $packsChanged = $false
+  foreach ($cp in $customPacks) {
+    if ([string]$cp.List -ne $activeList) { continue }
+    $newIds = @($cp.Ids | ForEach-Object { if ([string]$_ -eq ('CAT:' + $oldName)) { 'CAT:' + $newName } else { [string]$_ } })
+    if (@(Compare-Object @($cp.Ids) $newIds).Count -gt 0) { $cp.Ids = $newIds; $packsChanged = $true }
+  }
+  foreach ($bpName in @(Get-BuiltinCatPackNames $oldName)) {
+    $existing = @($customPacks | Where-Object { $_.Name -eq $bpName -and [string]$_.List -eq $activeList })[0]
+    if ($existing) { continue }
+    $bp = @($Packs | Where-Object { [string]$_.Name -eq $bpName })[0]
+    if (-not $bp) { continue }
+    $newIds = @($bp.Ids | ForEach-Object { if ([string]$_ -eq ('CAT:' + $oldName)) { 'CAT:' + $newName } else { [string]$_ } })
+    $customPacks += @{ Name = $bpName; Desc = [string]$bp.Desc; Ids = $newIds; Source = $bpName; List = $activeList; Created = (Get-Date -Format 'yyyy-MM-dd') }
+    $packsChanged = $true
+  }
+  if ($packsChanged) { Save-CustomPacks $customPacks }
+  if ($script:GuiSelectedCategories -and $script:GuiSelectedCategories.ContainsKey($oldName)) {
+    $script:GuiSelectedCategories.Remove($oldName)
+    $script:GuiSelectedCategories[$newName] = $true
+  }
+  Set-GuiTransientStatus (("Renamed category '" + $oldName + "' to '" + $newName + "' (" + $moved + " mod(s) moved)."))
+  Refresh-GuiAfterListChange
 }
 
 function Delete-GuiSelectedCategories {
@@ -4363,6 +4443,7 @@ function New-GuiCustomPack {
   $customPacks = @(Get-CustomPacks)
   $customPacks += @{ Name = $nm; Desc = $desc; Ids = @(); List = (Get-ActiveListSafe); Created = (Get-Date -Format 'yyyy-MM-dd') }
   Save-CustomPacks $customPacks
+  Remove-RemovedPackName (Get-ActiveListSafe) $nm
   $script:GuiPackDetailName = $nm
   Set-GuiTransientStatus ("Created pack '" + $nm + "'. Add members below.")
   # Standard: refresh every view after this change (one composite call).
@@ -4379,7 +4460,7 @@ function Reset-GuiCustomPack([string]$packName) {
   if (-not $target) { return }
   $sourceName = [string]$target.Source
   if ($sourceName -eq '') { return }
-  $source = @(Get-AllPacks | Where-Object { $_.Name -eq $sourceName -and -not $_.Custom })[0]
+  $source = @(Get-AllPacks -AllLists | Where-Object { $_.Name -eq $sourceName -and -not $_.Custom })[0]
   if (-not $source) { Set-GuiTransientStatus (("Can't reset: built-in pack '" + $sourceName + "' no longer exists.")); return }
   $res = Show-GuiMessageBox ('Reset "' + $packName + '" to match built-in pack "' + $sourceName + '"? This discards your edits to the copy.') 'PZ Mod Manager' ([System.Windows.MessageBoxButton]::YesNo) ([System.Windows.MessageBoxImage]::Warning)
   if ($res -ne [System.Windows.MessageBoxResult]::Yes) { return }
@@ -4390,7 +4471,32 @@ function Reset-GuiCustomPack([string]$packName) {
   Refresh-GuiAfterListChange
 }
 
+function Edit-GuiPackDescription([string]$packName) {
+  # Edit any pack's description. A custom pack edits in place; a
+  # built-in pack converts to a custom copy (same name) carrying the
+  # new description.
+  $allPacks = @(Get-AllPacks)
+  $pack = @($allPacks | Where-Object { $_.Name -eq $packName })[0]
+  if (-not $pack) { return }
+  $newDesc = Read-GuiInput 'Description for the pack' 'PZ Mod Manager' ([string]$pack.Desc)
+  if ($null -eq $newDesc -or $newDesc -eq [string]$pack.Desc) { return }
+  $customPacks = @(Get-CustomPacks)
+  $activeList = Get-ActiveListSafe
+  $target = @($customPacks | Where-Object { $_.Name -eq $packName -and [string]$_.List -eq $activeList })[0]
+  if ($target) {
+    $target.Desc = $newDesc
+  } else {
+    $customPacks += @{ Name = $packName; Desc = $newDesc; Ids = @($pack.Ids); Source = $packName; List = $activeList; Created = (Get-Date -Format 'yyyy-MM-dd') }
+  }
+  Save-CustomPacks $customPacks
+  Set-GuiTransientStatus ("Updated description of '" + $packName + "'.")
+  Refresh-GuiAfterListChange
+}
+
 function Rename-GuiCustomPack([string]$oldName) {
+  # Rename any pack in the active list. A custom pack renames in
+  # place; a built-in pack converts to a custom copy under the new
+  # name and the built-in name is tombstoned for this list.
   $newName = Read-GuiInput 'New name for the pack' 'PZ Mod Manager' $oldName
   if (-not $newName -or $newName -eq $oldName) { return }
   $allPacks = @(Get-AllPacks)
@@ -4401,9 +4507,20 @@ function Rename-GuiCustomPack([string]$oldName) {
   $customPacks = @(Get-CustomPacks)
   $activeList = Get-ActiveListSafe
   $target = @($customPacks | Where-Object { $_.Name -eq $oldName -and [string]$_.List -eq $activeList })[0]
-  if (-not $target) { return }
-  $target.Name = $newName
-  Save-CustomPacks $customPacks
+  if ($target) {
+    $target.Name = $newName
+    Save-CustomPacks $customPacks
+    # If this was a same-name copy of a built-in, the built-in would
+    # reappear under the old name - tombstone it for this list.
+    if (@($Packs | ForEach-Object { [string]$_.Name }) -contains $oldName) { Add-RemovedPackName $activeList $oldName }
+  } else {
+    $builtin = @($allPacks | Where-Object { $_.Name -eq $oldName -and -not $_.Custom })[0]
+    if (-not $builtin) { return }
+    $customPacks += @{ Name = $newName; Desc = [string]$builtin.Desc; Ids = @($builtin.Ids); Source = $oldName; List = $activeList; Created = (Get-Date -Format 'yyyy-MM-dd') }
+    Save-CustomPacks $customPacks
+    Add-RemovedPackName $activeList $oldName
+  }
+  Remove-RemovedPackName $activeList $newName
   # Keep the selection on the renamed pack: the selection is keyed by
   # name, so move the old key to the new name (same stale-key bug).
   if ($script:GuiSelectedPacks -and $script:GuiSelectedPacks.ContainsKey($oldName)) {
@@ -4457,7 +4574,7 @@ function Update-GuiPackSelectionButtons {
   if ($script:GuiSelectedPacks) { $n = $script:GuiSelectedPacks.Count }
   if ($script:GuiPackRenameDeleteButton) {
     # Merged Rename / Delete: enabled when anything is checked; the
-    # menu itself enables Rename/Delete only for custom packs.
+    # menu itself gates Rename / Edit Description / Delete by count.
     $script:GuiPackRenameDeleteButton.IsEnabled = ($n -gt 0)
   }
   # Member (mod) sub-selection: checked pack members feed the shared
@@ -4647,26 +4764,29 @@ function Refresh-GuiPackDetail($pack) {
   if ($script:GuiPackResetButton) { $script:GuiPackResetButton.Visibility = if ($isCustom -and [string]$pack.Source -ne '') { [System.Windows.Visibility]::Visible } else { [System.Windows.Visibility]::Collapsed } }
 }
 function Delete-GuiSelectedPacks {
-  # Delete every checked CUSTOM pack (built-in packs can't be deleted).
-  # One confirm for the batch. Clears the pack selection.
+  # Delete every checked pack. Custom packs are removed; built-in
+  # packs are tombstoned for the active list (they stay deleted in
+  # this list and still exist in other lists). One confirm.
   if (-not $script:GuiSelectedPacks -or $script:GuiSelectedPacks.Count -eq 0) { Set-GuiTransientStatus ('Select at least one pack first.'); return }
   $names = @($script:GuiSelectedPacks.Keys)
   $all = @(Get-AllPacks)
-  $customNames = @()
+  $targets = @()
   foreach ($nm in $names) {
     $pk = @($all | Where-Object { [string]$_.Name -eq $nm })[0]
-    if ($pk -and $pk.Custom) { $customNames += $nm }
+    if ($pk) { $targets += $nm }
   }
-  if ($customNames.Count -eq 0) { Set-GuiTransientStatus ('Only custom packs can be deleted (built-in packs are protected).'); return }
-  $res = Show-GuiMessageBox ('Delete ' + $customNames.Count + ' selected pack(s) (' + ($customNames -join ', ') + ')?') 'PZ Mod Manager' ([System.Windows.MessageBoxButton]::YesNo) ([System.Windows.MessageBoxImage]::Warning)
+  if ($targets.Count -eq 0) { return }
+  $res = Show-GuiMessageBox ('Delete ' + $targets.Count + ' selected pack(s) (' + ($targets -join ', ') + ')?') 'PZ Mod Manager' ([System.Windows.MessageBoxButton]::YesNo) ([System.Windows.MessageBoxImage]::Warning)
   if ($res -ne [System.Windows.MessageBoxResult]::Yes) { return }
   $activeList = Get-ActiveListSafe
+  $builtinNames = @($Packs | ForEach-Object { [string]$_.Name })
   $customPacks = @(Get-CustomPacks)
-  $customPacks = @($customPacks | Where-Object { -not ($customNames -contains [string]$_.Name -and [string]$_.List -eq $activeList) })
+  $customPacks = @($customPacks | Where-Object { -not ($targets -contains [string]$_.Name -and [string]$_.List -eq $activeList) })
   Save-CustomPacks $customPacks
-  if ($customNames -contains $script:GuiPackDetailName) { $script:GuiPackDetailName = '' }
+  foreach ($nm in $targets) { if ($builtinNames -contains $nm) { Add-RemovedPackName $activeList $nm } }
+  if ($targets -contains $script:GuiPackDetailName) { $script:GuiPackDetailName = '' }
   $script:GuiSelectedPacks = @{}
-  Set-GuiTransientStatus (('Deleted ' + $customNames.Count + ' selected pack(s).'))
+  Set-GuiTransientStatus (('Deleted ' + $targets.Count + ' selected pack(s).'))
   # Standard: refresh every view after this change (one composite call).
   Refresh-GuiAfterListChange
 }
@@ -6674,7 +6794,7 @@ function Show-Gui {
           <ScrollViewer Grid.Row="1" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled" Margin="0,0,0,8">
           <StackPanel Orientation="Horizontal">
             <Button x:Name="AddCategoryButton" Content="Add Category" Padding="10,4" Margin="0,0,12,0"/>
-            <Button x:Name="DeleteSelectedCategoriesButton" Content="Delete Selected Categories" Padding="10,4" Margin="0,0,12,0"/>
+            <Button x:Name="CategoryRenameDeleteButton" Content="Rename / Delete" Padding="10,4" Margin="0,0,12,0"/>
             <TextBlock Text="Select mods in the Mods tab, then use Move To Category there." VerticalAlignment="Center" Foreground="Gray"/>
           </StackPanel>
           </ScrollViewer>
@@ -6794,7 +6914,7 @@ function Show-Gui {
     $script:GuiAddCategoryButton = $script:GuiWindow.FindName('AddCategoryButton')
     $script:GuiCategoryListView = $script:GuiWindow.FindName('CategoryListView')
     $script:GuiCategorySearchBox = $script:GuiWindow.FindName('CategorySearchBox')
-    $script:GuiDeleteSelectedCategoriesButton = $script:GuiWindow.FindName('DeleteSelectedCategoriesButton')
+    $script:GuiCategoryRenameDeleteButton = $script:GuiWindow.FindName('CategoryRenameDeleteButton')
     $script:GuiNewListButton = $script:GuiWindow.FindName('NewListButton')
     $script:GuiImportListButton = $script:GuiWindow.FindName('ImportListButton')
     $script:GuiExportSelectedListButton = $script:GuiWindow.FindName('ExportSelectedListButton')
@@ -7057,31 +7177,52 @@ function Show-Gui {
       if ($pn.Count -eq 1) { Rename-GuiCustomPack $pn[0] }
     })
     [void]$script:GuiPackRenameDeleteMenu.Items.Add($script:GuiPackRenameDeleteRenameItem)
+    $script:GuiPackRenameDeleteDescItem = New-Object System.Windows.Controls.MenuItem
+    $script:GuiPackRenameDeleteDescItem.Header = 'Edit Pack Description...'
+    $script:GuiPackRenameDeleteDescItem.Add_Click({
+      $pn = @($script:GuiSelectedPacks.Keys)
+      if ($pn.Count -eq 1) { Edit-GuiPackDescription $pn[0] }
+    })
+    [void]$script:GuiPackRenameDeleteMenu.Items.Add($script:GuiPackRenameDeleteDescItem)
     $script:GuiPackRenameDeleteDeleteItem = New-Object System.Windows.Controls.MenuItem
     $script:GuiPackRenameDeleteDeleteItem.Header = 'Delete Selected Packs'
     $script:GuiPackRenameDeleteDeleteItem.Add_Click({ Delete-GuiSelectedPacks })
     [void]$script:GuiPackRenameDeleteMenu.Items.Add($script:GuiPackRenameDeleteDeleteItem)
     $script:GuiPackRenameDeleteMenu.Add_Opened({
-      # Rename needs exactly one checked CUSTOM pack; Delete needs at
-      # least one checked custom pack (built-ins can't be renamed/deleted).
-      $allPk = @(Get-AllPacks)
-      $selCustom = @()
-      foreach ($nm in @($script:GuiSelectedPacks.Keys)) {
-        $pk = @($allPk | Where-Object { [string]$_.Name -eq $nm })[0]
-        if ($pk -and $pk.Custom) { $selCustom += $nm }
-      }
-      $script:GuiPackRenameDeleteRenameItem.IsEnabled = ($selCustom.Count -eq 1)
-      # Self-explanatory disabled state: rename/delete apply to custom
-      # packs only; built-in packs cannot be renamed or deleted.
-      if ($selCustom.Count -eq 1) { $script:GuiPackRenameDeleteRenameItem.Header = 'Rename Selected Pack...' }
-      else { $script:GuiPackRenameDeleteRenameItem.Header = 'Rename Selected Pack... (custom packs only)' }
-      $script:GuiPackRenameDeleteDeleteItem.IsEnabled = ($selCustom.Count -gt 0)
-      $script:GuiPackRenameDeleteDeleteItem.Header = ('Delete selected packs (' + $selCustom.Count + ' custom)')
+      # Rename and Edit Description need exactly one checked pack;
+      # Delete needs at least one. Built-in packs are included -
+      # renaming or deleting one applies to the active list only.
+      $npk = 0
+      if ($script:GuiSelectedPacks) { $npk = $script:GuiSelectedPacks.Count }
+      $script:GuiPackRenameDeleteRenameItem.IsEnabled = ($npk -eq 1)
+      $script:GuiPackRenameDeleteDescItem.IsEnabled = ($npk -eq 1)
+      $script:GuiPackRenameDeleteDeleteItem.IsEnabled = ($npk -gt 0)
+      $script:GuiPackRenameDeleteDeleteItem.Header = ('Delete selected packs (' + $npk + ')')
     })
     $script:GuiPackRenameDeleteButton.ContextMenu = $script:GuiPackRenameDeleteMenu
     $script:GuiPackRenameDeleteButton.Add_Click({ $script:GuiPackRenameDeleteButton.ContextMenu.IsOpen = $true })
     $script:GuiPackResetButton.Add_Click({ Reset-GuiCustomPack $script:GuiPackDetailName })
-    $script:GuiDeleteSelectedCategoriesButton.Add_Click({ Delete-GuiSelectedCategories })
+    $script:GuiCategoryRenameDeleteMenu = New-Object System.Windows.Controls.ContextMenu
+    $script:GuiCategoryRenameItem = New-Object System.Windows.Controls.MenuItem
+    $script:GuiCategoryRenameItem.Header = 'Rename Selected Category...'
+    $script:GuiCategoryRenameItem.Add_Click({
+      $cn = @($script:GuiSelectedCategories.Keys)
+      if ($cn.Count -eq 1) { Rename-GuiCategory $cn[0] }
+    })
+    [void]$script:GuiCategoryRenameDeleteMenu.Items.Add($script:GuiCategoryRenameItem)
+    $script:GuiCategoryDeleteItem = New-Object System.Windows.Controls.MenuItem
+    $script:GuiCategoryDeleteItem.Header = 'Delete Selected Categories'
+    $script:GuiCategoryDeleteItem.Add_Click({ Delete-GuiSelectedCategories })
+    [void]$script:GuiCategoryRenameDeleteMenu.Items.Add($script:GuiCategoryDeleteItem)
+    $script:GuiCategoryRenameDeleteMenu.Add_Opened({
+      $nc2 = 0
+      if ($script:GuiSelectedCategories) { $nc2 = $script:GuiSelectedCategories.Count }
+      $script:GuiCategoryRenameItem.IsEnabled = ($nc2 -eq 1)
+      $script:GuiCategoryDeleteItem.IsEnabled = ($nc2 -gt 0)
+      $script:GuiCategoryDeleteItem.Header = ('Delete selected categories (' + $nc2 + ')')
+    })
+    $script:GuiCategoryRenameDeleteButton.ContextMenu = $script:GuiCategoryRenameDeleteMenu
+    $script:GuiCategoryRenameDeleteButton.Add_Click({ $script:GuiCategoryRenameDeleteButton.ContextMenu.IsOpen = $true })
 
     $script:GuiListRenameDeleteMenu = New-Object System.Windows.Controls.ContextMenu
     $script:GuiListRenameDeleteRenameItem = New-Object System.Windows.Controls.MenuItem
