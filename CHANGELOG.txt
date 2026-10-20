@@ -1,6 +1,7 @@
 PZ MOD MANAGER - FULL CHANGELOG
 Created by duy64. Licensed under the MIT License (see LICENSE.txt).
 
+v395: Header Select-All checkbox now syncs inside every Update-*SelectionButtons call, so it stays truthful on individual row toggles too (not just on refresh).
 v394: UI state consistency standard. Selection now resets on any filter/search change and after install/uninstall (Clear-GuiSelection, all tabs). Header Select-All checkbox re-syncs on every refresh (Sync-GuiHeaderCheckbox) instead of holding stale state.
 v393: Mods tab Search and ID/URL boxes now start at the same vertical position (fixed label widths).
 v392: Fixed v391 startup crash (int + string concatenation in the new status text; now uses format strings).
