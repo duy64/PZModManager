@@ -1,7 +1,7 @@
 # PZ Mod Manager - Created by duy64. Licensed under the MIT License (see LICENSE.txt).
 #Requires -Version 5.1
 <#
-  PZ Mod Manager v431 - B42 Essentials: mod pack for Single-Player & Multiplayer
+  PZ Mod Manager v432 - B42 Essentials: mod pack for Single-Player & Multiplayer
   Full collection (~190 mods) + Cheat Menu: Rebuild, no Steam client needed.
 #>
 $ErrorActionPreference = 'Stop'
@@ -17,7 +17,7 @@ $NL          = [Environment]::NewLine
 # Target game build. B43 = change these lines; the layout repair and [10] checks derive from them.
 $GameBuild = '42'      # major build: version folder name (42/)
 $GameBuildFull = '42.21'  # current full build: versionMax floor for [10] warnings
-$ScriptVersion = '431'    # app version: shown in the menu header + GUI title
+$ScriptVersion = '432'    # app version: shown in the menu header + GUI title
 
 # All known categories, including ones with zero mods right now (Maps /
 # Audio / Zombies have no catalog mods yet). The category editor lists
@@ -434,7 +434,7 @@ function Get-SafeListName([string]$name) {
 function Get-NamedLists {
   $out = @()
   if (-not (Test-Path $ListsDir)) { return $out }
-  foreach ($f in @(Get-ChildItem $ListsDir -Filter '*.json' -File -ErrorAction SilentlyContinue)) {
+  foreach ($f in @(Get-ChildItem $ListsDir -Filter '*.json' -ErrorAction SilentlyContinue) | Where-Object { -not $_.PSIsContainer }) {
     try {
       $d = Get-Content $f.FullName -Raw -ErrorAction Stop | ConvertFrom-Json
       $mods = @($d.mods)
@@ -527,7 +527,7 @@ function Get-CustomPacks {
   # with its owning list (List = file-safe list name).
   $out = @()
   if (-not (Test-Path $ListsDir)) { return $out }
-  foreach ($f in @(Get-ChildItem $ListsDir -Filter '*.json' -File -ErrorAction SilentlyContinue)) {
+  foreach ($f in @(Get-ChildItem $ListsDir -Filter '*.json' -ErrorAction SilentlyContinue) | Where-Object { -not $_.PSIsContainer }) {
     $safe = [IO.Path]::GetFileNameWithoutExtension($f.Name)
     try {
       $d = Get-Content $f.FullName -Raw -ErrorAction Stop | ConvertFrom-Json
@@ -582,7 +582,7 @@ function Save-CustomPacks($packs) {
     Save-NamedListData $lst ([string]$d.name) @($d.mods) @($byList[$lst]) $null
   }
   if (Test-Path $ListsDir) {
-    foreach ($f in @(Get-ChildItem $ListsDir -Filter '*.json' -File -ErrorAction SilentlyContinue)) {
+    foreach ($f in @(Get-ChildItem $ListsDir -Filter '*.json' -ErrorAction SilentlyContinue) | Where-Object { -not $_.PSIsContainer }) {
       $safe = [IO.Path]::GetFileNameWithoutExtension($f.Name)
       if (-not $byList.ContainsKey($safe)) {
         $d = Get-NamedListData $safe
@@ -1046,7 +1046,7 @@ function Get-ModDiskSize($folderNames) {
   foreach ($fn in @($folderNames)) {
     $dir = Join-Path $ModsDir ([string]$fn)
     if (-not (Test-Path $dir)) { continue }
-    $sum = (Get-ChildItem $dir -Recurse -File -ErrorAction SilentlyContinue | Measure-Object Length -Sum).Sum
+    $sum = (Get-ChildItem $dir -Recurse -ErrorAction SilentlyContinue | Where-Object { -not $_.PSIsContainer } | Measure-Object Length -Sum).Sum
     if ($sum) { $total += [long]$sum }
   }
   return $total
@@ -1069,7 +1069,7 @@ function Get-ContentStamp($path) {
   # stamps regardless of when they were downloaded.
   try { Add-Type -AssemblyName System.Security -ErrorAction SilentlyContinue } catch { }
   $sha = [System.Security.Cryptography.SHA256]::Create()
-  $files = @(Get-ChildItem $path -Recurse -File -ErrorAction SilentlyContinue | Sort-Object FullName)
+  $files = @(Get-ChildItem $path -Recurse -ErrorAction SilentlyContinue | Where-Object { -not $_.PSIsContainer } | Sort-Object FullName)
   foreach ($f in $files) {
     $rel = $f.FullName.Substring($path.Length)
     $meta = [System.Text.Encoding]::UTF8.GetBytes($rel + '|' + $f.Length + '|')
@@ -1574,10 +1574,10 @@ function Get-ShallowModInfos {
   # mods), so startup adopt stays fast and the GUI loads quickly.
   $out = @()
   if (-not (Test-Path $ModsDir)) { return @() }
-  foreach ($top in @(Get-ChildItem $ModsDir -Directory -ErrorAction SilentlyContinue)) {
+  foreach ($top in @(Get-ChildItem $ModsDir -ErrorAction SilentlyContinue) | Where-Object { $_.PSIsContainer }) {
     $mi = Join-Path $top.FullName 'mod.info'
     if (Test-Path $mi) { $out += Get-Item $mi }
-    foreach ($sub in @(Get-ChildItem $top.FullName -Directory -ErrorAction SilentlyContinue)) {
+    foreach ($sub in @(Get-ChildItem $top.FullName -ErrorAction SilentlyContinue) | Where-Object { $_.PSIsContainer }) {
       $mi2 = Join-Path $sub.FullName 'mod.info'
       if (Test-Path $mi2) { $out += Get-Item $mi2 }
     }
@@ -1601,14 +1601,14 @@ function Get-InstalledModStamp($topFolderPath) {
   # NOTE: Get-FoldersStamp needs objects with .FullName - passing a
   # bare string yields $null and a stamp of 0 (v234 Adopt bug).
   if (-not (Test-Path $topFolderPath)) { return 0 }
-  $dirs = @(Get-ChildItem $topFolderPath -Directory -Recurse | Where-Object { Test-Path (Join-Path $_.FullName 'mod.info') })
+  $dirs = @(Get-ChildItem $topFolderPath -Recurse | Where-Object { $_.PSIsContainer } | Where-Object { Test-Path (Join-Path $_.FullName 'mod.info') })
   if (Test-Path (Join-Path $topFolderPath 'mod.info')) { $dirs = @(@(Get-Item $topFolderPath) + $dirs) }
   return (Get-FoldersStamp $dirs)
 }
 
 function Repair-GenericModFolders {
   if (-not (Test-Path $ModsDir)) { return }
-  $dirs = @(Get-ChildItem $ModsDir -Directory | Where-Object { $_.Name -match '^(?i)(\d{10}([_.].*)?|\d+(\.\d+)*(_\d+(\.\d+)*)?|common|mods?|main|default)$' })
+  $dirs = @(Get-ChildItem $ModsDir | Where-Object { $_.PSIsContainer } | Where-Object { $_.Name -match '^(?i)(\d{10}([_.].*)?|\d+(\.\d+)*(_\d+(\.\d+)*)?|common|mods?|main|default)$' })
   if ($dirs.Count -eq 0) { return }
   $map = Get-InstallMap
   $renamed = 0
@@ -1664,12 +1664,12 @@ function Repair-FlattenedMods {
   # <build> is $GameBuild (e.g. '42'); version folders look like 42.20.
   if (-not (Test-Path $ModsDir)) { return }
   $verPattern = '^(?i)' + $GameBuild + '\.\d+$'
-  foreach ($d in (Get-ChildItem $ModsDir -Directory)) {
+  foreach ($d in (Get-ChildItem $ModsDir) | Where-Object { $_.PSIsContainer }) {
     # Case B (un-nest): an earlier repair nested a version folder inside <build>/ (e.g. 42/42.20/).
     # The game loads Lua from <build>/media/, so flatten one level: <build>/<ver>/* -> <build>/*.
     $verDir = Join-Path $d.FullName $GameBuild
     if (Test-Path $verDir) {
-      $nested = @(Get-ChildItem $verDir -Directory | Where-Object { $_.Name -match $verPattern -and ((Test-Path (Join-Path $_.FullName 'mod.info')) -or (Test-Path (Join-Path $_.FullName 'media'))) })
+      $nested = @(Get-ChildItem $verDir | Where-Object { $_.PSIsContainer } | Where-Object { $_.Name -match $verPattern -and ((Test-Path (Join-Path $_.FullName 'mod.info')) -or (Test-Path (Join-Path $_.FullName 'media'))) })
       foreach ($n in $nested) {
         Write-Host ("  Un-nesting version folder '" + $d.Name + "/" + $GameBuild + "/" + $n.Name + "' -> '" + $d.Name + "/" + $GameBuild + "/'...") -ForegroundColor Yellow
         foreach ($item in (Get-ChildItem $n.FullName)) {
@@ -1683,7 +1683,7 @@ function Repair-FlattenedMods {
     # Case A (rename): mod ships code in a version folder (e.g. 42.20/) instead of <build>/.
     # The game loads versioned content from <build>/ only, so rename the folder to <build>.
     # (A-Life 1.4.2 ships 42.20/.)
-    $verFolders = @(Get-ChildItem $d.FullName -Directory | Where-Object { $_.Name -match $verPattern -and (Test-Path (Join-Path $_.FullName 'mod.info')) })
+    $verFolders = @(Get-ChildItem $d.FullName | Where-Object { $_.PSIsContainer } | Where-Object { $_.Name -match $verPattern -and (Test-Path (Join-Path $_.FullName 'mod.info')) })
     if ($verFolders.Count -gt 0) {
       $vf = @($verFolders | Sort-Object { [version]$_.Name } -Descending)[0]
       Write-Host ("  Renaming version folder '" + $d.Name + "/" + $vf.Name + "' -> '" + $d.Name + "/" + $GameBuild + "/'...") -ForegroundColor Yellow
@@ -1762,7 +1762,7 @@ function Get-DiskModIdMap {
   if ($script:DiskModIdMap) { return $script:DiskModIdMap }
   $map = @{}
   if (Test-Path $ModsDir) {
-    foreach ($chk in @(Get-ChildItem $ModsDir -Recurse -Filter 'mod.info' -File -ErrorAction SilentlyContinue)) {
+    foreach ($chk in @(Get-ChildItem $ModsDir -Recurse -Filter 'mod.info' -ErrorAction SilentlyContinue) | Where-Object { -not $_.PSIsContainer }) {
       $mid = Get-ModInfoId $chk.FullName
       if ($mid -ne '' -and -not $map.ContainsKey($mid)) { $map[$mid] = $chk.Directory.Name }
     }
@@ -1944,7 +1944,7 @@ function Complete-InstallModCore([string]$WorkshopId, [string]$Name, $keptDirs, 
   # Rescue empty installs: the download's real content may sit in a sibling folder
   # the mod.info scan never copies (single-mod items), or the cache may be truncated.
   if (-not $script:EmptyRetry) { $script:EmptyRetry = @{} }
-  $testEmpty = { param($d) @(Get-ChildItem $d -Recurse -File -ErrorAction SilentlyContinue | Where-Object { $_.Name -ne 'mod.info' -and $_.Extension -notmatch '(?i)\.(png|jpg|jpeg|gif|bmp)$' } | Select-Object -First 1).Count -eq 0 }
+  $testEmpty = { param($d) @(Get-ChildItem $d -Recurse -ErrorAction SilentlyContinue | Where-Object { -not $_.PSIsContainer } | Where-Object { $_.Name -ne 'mod.info' -and $_.Extension -notmatch '(?i)\.(png|jpg|jpeg|gif|bmp)$' } | Select-Object -First 1).Count -eq 0 }
   for ($fi = 0; $fi -lt $finalNames.Count; $fi++) {
     $dn = $finalNames[$fi]
     $destDir = Join-Path $ModsDir $dn
@@ -1953,13 +1953,13 @@ function Complete-InstallModCore([string]$WorkshopId, [string]$Name, $keptDirs, 
     if ($finalNames.Count -eq 1) {
       $modSrc = $keptDirs[$fi].FullName
       $modParent = Split-Path $modSrc -Parent
-      $cands = @(Get-ChildItem $modParent -Directory -ErrorAction SilentlyContinue)
-      if ($modParent -ne $src) { $cands += @(Get-ChildItem $src -Directory -ErrorAction SilentlyContinue) }
+      $cands = @(Get-ChildItem $modParent -ErrorAction SilentlyContinue | Where-Object { $_.PSIsContainer })
+      if ($modParent -ne $src) { $cands += @(Get-ChildItem $src -ErrorAction SilentlyContinue | Where-Object { $_.PSIsContainer }) }
       foreach ($cand in $cands) {
         if ($cand.FullName -eq $modSrc) { continue }
         if (Test-Path (Join-Path $destDir $cand.Name)) { continue }
         if ($modSrc -like ($cand.FullName + '\*')) { continue }
-        if (@(Get-ChildItem $cand.FullName -Recurse -Filter 'mod.info' -File -ErrorAction SilentlyContinue | Select-Object -First 1).Count -gt 0) { continue }
+        if (@(Get-ChildItem $cand.FullName -Recurse -Filter 'mod.info' -ErrorAction SilentlyContinue | Where-Object { -not $_.PSIsContainer } | Select-Object -First 1).Count -gt 0) { continue }
         Copy-Item $cand.FullName $destDir -Recurse -Force
         Write-Host ("  Rescued sibling content '" + $cand.Name + "' into " + $dn) -ForegroundColor Cyan
       }
@@ -2081,9 +2081,9 @@ function Install-Mod([string]$WorkshopId, [string]$Name) {
         if ($raw0) {
           $mjar0 = [regex]::Match($raw0, '(?m)^\s*javaJarFile\s*=\s*(.+?)\s*$')
           if ($mjar0.Success -and -not (Test-Path (Join-Path $fd0 $mjar0.Groups[1].Value.Trim()))) { $allThere = $false; break }
-          $df0 = @(Get-ChildItem $fd0 -File -ErrorAction SilentlyContinue)
+          $df0 = @(Get-ChildItem $fd0 -ErrorAction SilentlyContinue | Where-Object { -not $_.PSIsContainer })
           $ni0 = @($df0 | Where-Object { $_.Name -ne 'mod.info' -and $_.Extension -notmatch '(?i)\.(png|jpg|jpeg|gif|bmp)$' })
-          $sd0 = @(Get-ChildItem $fd0 -Directory -ErrorAction SilentlyContinue)
+          $sd0 = @(Get-ChildItem $fd0 -ErrorAction SilentlyContinue | Where-Object { $_.PSIsContainer })
           if ($ni0.Count -eq 0 -and $sd0.Count -eq 0) { $allThere = $false; break }
         }
       }
@@ -2226,13 +2226,13 @@ function Install-Mod([string]$WorkshopId, [string]$Name) {
     }
   }
   $modsFound = @()
-  if (Test-Path $src) { $modsFound = @(Get-ChildItem $src -Directory -Recurse | Where-Object { Test-Path (Join-Path $_.FullName 'mod.info') }) }
+  if (Test-Path $src) { $modsFound = @(Get-ChildItem $src -Recurse | Where-Object { $_.PSIsContainer } | Where-Object { Test-Path (Join-Path $_.FullName 'mod.info') }) }
   if ($modsFound.Count -eq 0) {
     # Download with 1 retry - SteamCMD anonymous sometimes returns empty on first try
     for ($attempt = 1; $attempt -le 2; $attempt++) {
       Write-Host ("  Downloading [" + $Name + "] (attempt " + $attempt + "/2)...") -ForegroundColor DarkCyan
       $scOut = Invoke-SteamCmd @('+login', 'anonymous', '+workshop_download_item', $AppId, $WorkshopId, 'validate', '+quit')
-      if (Test-Path $src) { $modsFound = @(Get-ChildItem $src -Directory -Recurse | Where-Object { Test-Path (Join-Path $_.FullName 'mod.info') }) }
+      if (Test-Path $src) { $modsFound = @(Get-ChildItem $src -Recurse | Where-Object { $_.PSIsContainer } | Where-Object { Test-Path (Join-Path $_.FullName 'mod.info') }) }
       if ($modsFound.Count -gt 0) { break }
       # Still empty after this attempt - on final attempt show SteamCMD errors for diagnosis
       if ($attempt -eq 2) {
@@ -2267,17 +2267,17 @@ function Install-Mod([string]$WorkshopId, [string]$Name) {
     if ($expectedSize -gt 0) {
       for ($szAttempt = 1; $szAttempt -le 3; $szAttempt++) {
         $actualSize = [long]0
-        $szSum = (Get-ChildItem $src -Recurse -File -ErrorAction SilentlyContinue | Measure-Object Length -Sum).Sum
+        $szSum = (Get-ChildItem $src -Recurse -ErrorAction SilentlyContinue | Where-Object { -not $_.PSIsContainer } | Measure-Object Length -Sum).Sum
         if ($szSum) { $actualSize = [long]$szSum }
         if ($actualSize -ge ($expectedSize * 0.95)) { break }
         Write-Host ("  Download looks incomplete (" + $actualSize + " of " + $expectedSize + " bytes) - re-downloading (round " + $szAttempt + "/3)...") -ForegroundColor Yellow
         [void](Invoke-SteamCmd @('+login', 'anonymous', '+workshop_download_item', $AppId, $WorkshopId, 'validate', '+quit'))
       }
-      $szSum2 = (Get-ChildItem $src -Recurse -File -ErrorAction SilentlyContinue | Measure-Object Length -Sum).Sum
+      $szSum2 = (Get-ChildItem $src -Recurse -ErrorAction SilentlyContinue | Where-Object { -not $_.PSIsContainer } | Measure-Object Length -Sum).Sum
       if ($szSum2 -and [long]$szSum2 -lt ($expectedSize * 0.95)) {
         Write-Host ("  WARNING: download still incomplete after retries (" + [long]$szSum2 + " of " + $expectedSize + " bytes) - installing what is available.") -ForegroundColor Yellow
       }
-      $modsFound = @(Get-ChildItem $src -Directory -Recurse | Where-Object { Test-Path (Join-Path $_.FullName 'mod.info') })
+      $modsFound = @(Get-ChildItem $src -Recurse | Where-Object { $_.PSIsContainer } | Where-Object { Test-Path (Join-Path $_.FullName 'mod.info') })
     }
   }
   if ($modsFound.Count -eq 0) { Write-Host ("  WARNING: no mod found inside " + $WorkshopId) -ForegroundColor Yellow; return $false }
@@ -2357,7 +2357,7 @@ function Install-Mod([string]$WorkshopId, [string]$Name) {
 
 function Get-InstalledMods {
   if (-not (Test-Path $ModsDir)) { return @() }
-  Get-ChildItem $ModsDir -Directory | Select-Object -ExpandProperty Name
+  Get-ChildItem $ModsDir | Where-Object { $_.PSIsContainer } | Select-Object -ExpandProperty Name
 }
 
 function Get-DisplayMods {
@@ -2518,7 +2518,7 @@ function Find-ModUpdates {
     if ($id -notmatch '^\d+$') { continue }
     $src = Join-Path (Join-Path (Join-Path $SteamCmdDir 'steamapps') 'workshop') ('content\' + $AppId + '\' + $id)
     if (-not (Test-Path $src)) { continue }
-    $folders = @(Get-ChildItem $src -Directory -Recurse | Where-Object { Test-Path (Join-Path $_.FullName 'mod.info') })
+    $folders = @(Get-ChildItem $src -Recurse | Where-Object { $_.PSIsContainer } | Where-Object { Test-Path (Join-Path $_.FullName 'mod.info') })
     if ($folders.Count -eq 0) { continue }
     $prop = $map.PSObject.Properties[$id]
     $stamp = Get-FoldersStamp $folders
@@ -2548,7 +2548,7 @@ function Install-FoundUpdates($updates, $map) {
     if ($id -notmatch '^\d+$') { continue }
     $src = Join-Path (Join-Path (Join-Path $SteamCmdDir 'steamapps') 'workshop') ('content\' + $AppId + '\' + $id)
     if (-not (Test-Path $src)) { continue }
-    $folders = @(Get-ChildItem $src -Directory -Recurse | Where-Object { Test-Path (Join-Path $_.FullName 'mod.info') })
+    $folders = @(Get-ChildItem $src -Recurse | Where-Object { $_.PSIsContainer } | Where-Object { Test-Path (Join-Path $_.FullName 'mod.info') })
     if ($folders.Count -eq 0) { continue }
     $prop = $map.PSObject.Properties[$id]
     $stamp = Get-FoldersStamp $folders
@@ -3094,7 +3094,7 @@ function Find-GameFolder([bool]$AllowPrompt = $false) {
   foreach ($root in @('C:\Games', 'D:\Games', 'C:\Program Files', 'C:\Program Files (x86)')) {
     if (-not (Test-Path $root)) { continue }
     try {
-      $hit = Get-ChildItem $root -Directory -Recurse -Depth 2 -ErrorAction SilentlyContinue | Where-Object { Test-Path (Join-Path $_.FullName 'projectzomboid.jar') } | Select-Object -First 1
+      $hit = Get-ChildItem $root -Recurse -Depth 2 -ErrorAction SilentlyContinue | Where-Object { $_.PSIsContainer } | Where-Object { Test-Path (Join-Path $_.FullName 'projectzomboid.jar') } | Select-Object -First 1
       if ($hit) { return $hit.FullName }
     } catch { }
   }
@@ -3253,12 +3253,12 @@ function Install-ZombieBuddyAgent([bool]$AllowPrompt = $false) {
   # Find ZombieBuddy mod folder
   $zbDir = Join-Path $ModsDir 'ZombieBuddy'
   if (-not (Test-Path $zbDir)) {
-    $found = @(Get-ChildItem $ModsDir -Recurse -Filter 'mod.info' -File -ErrorAction SilentlyContinue | Where-Object { (Get-ModInfoId $_.FullName) -eq 'ZombieBuddy' } | Select-Object -First 1)
+    $found = @(Get-ChildItem $ModsDir -Recurse -Filter 'mod.info' -ErrorAction SilentlyContinue | Where-Object { -not $_.PSIsContainer } | Where-Object { (Get-ModInfoId $_.FullName) -eq 'ZombieBuddy' } | Select-Object -First 1)
     if ($found) { $zbDir = $found.DirectoryName }
   }
   if (-not (Test-Path $zbDir)) { Write-Host '  ZombieBuddy mod is not installed yet. Install it first (Living Worlds Pack or [3]).' -ForegroundColor Yellow; return }
-  $jar = Get-ChildItem $zbDir -Recurse -Filter 'ZombieBuddy.jar' -File -ErrorAction SilentlyContinue | Select-Object -First 1
-  $dll = Get-ChildItem $zbDir -Recurse -Filter 'zbNative.dll' -File -ErrorAction SilentlyContinue | Select-Object -First 1
+  $jar = Get-ChildItem $zbDir -Recurse -Filter 'ZombieBuddy.jar' -ErrorAction SilentlyContinue | Where-Object { -not $_.PSIsContainer } | Select-Object -First 1
+  $dll = Get-ChildItem $zbDir -Recurse -Filter 'zbNative.dll' -ErrorAction SilentlyContinue | Where-Object { -not $_.PSIsContainer } | Select-Object -First 1
   if (-not $jar) { Write-Host '  ZombieBuddy.jar not found inside the ZombieBuddy mod folder.' -ForegroundColor Yellow; return }
   $game = Find-GameFolder -AllowPrompt:$AllowPrompt
   if (-not $game) { if ($AllowPrompt) { Write-Host '  Game folder not found. Enter it when asked.' -ForegroundColor Yellow }; return }
@@ -3584,7 +3584,7 @@ function Set-StoredModCategory([string]$workshopId, [string]$cat) {
   # (not the override), so without this it would keep showing the old
   # category after a per-mod edit.
   if (Test-Path $ListsDir) {
-    foreach ($f in @(Get-ChildItem $ListsDir -Filter '*.json' -File -ErrorAction SilentlyContinue)) {
+    foreach ($f in @(Get-ChildItem $ListsDir -Filter '*.json' -ErrorAction SilentlyContinue) | Where-Object { -not $_.PSIsContainer }) {
       try {
         $d = Get-Content $f.FullName -Raw | ConvertFrom-Json
         $dirty = $false
@@ -4801,13 +4801,13 @@ function Get-StaleCacheFolders {
     foreach ($m in $Mods) { $needed[[string]$m.WorkshopId] = $true }
     $map = Get-InstallMap
     if ($map) { foreach ($pr in $map.PSObject.Properties) { $needed[[string]$pr.Name] = $true } }
-    $stale = @(Get-ChildItem $cacheRoot -Directory | Where-Object { -not $needed.ContainsKey($_.Name) })
+    $stale = @(Get-ChildItem $cacheRoot | Where-Object { $_.PSIsContainer } | Where-Object { -not $needed.ContainsKey($_.Name) })
   }
-  $tmpStale = @(Get-ChildItem ([IO.Path]::GetTempPath()) -Directory -Filter 'pzmod_*' -ErrorAction SilentlyContinue)
+  $tmpStale = @(Get-ChildItem ([IO.Path]::GetTempPath()) -Filter 'pzmod_*' -ErrorAction SilentlyContinue | Where-Object { $_.PSIsContainer })
   $all = @($stale + $tmpStale)
   $bytes = 0
   foreach ($d in $all) {
-    $sz = (Get-ChildItem $d.FullName -Recurse -File -ErrorAction SilentlyContinue | Measure-Object -Property Length -Sum).Sum
+    $sz = (Get-ChildItem $d.FullName -Recurse -ErrorAction SilentlyContinue | Where-Object { -not $_.PSIsContainer } | Measure-Object -Property Length -Sum).Sum
     if ($sz) { $bytes += $sz }
   }
   return @{ Folders = $all; Bytes = $bytes }
@@ -4838,7 +4838,7 @@ function Get-CompatibilityReport {
   # "Compatible" means "passes every static check", not a guarantee.
   $rows = @()
   if (-not (Test-Path $ModsDir)) { return $rows }
-  $allInfo = @(Get-ChildItem $ModsDir -Recurse -Filter 'mod.info' -File -ErrorAction SilentlyContinue)
+  $allInfo = @(Get-ChildItem $ModsDir -Recurse -Filter 'mod.info' -ErrorAction SilentlyContinue | Where-Object { -not $_.PSIsContainer })
   $topToInfos = @{}
   $diskModIds = @{}
   $modIdToInfos = @{}
