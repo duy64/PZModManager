@@ -1,7 +1,7 @@
 # PZ Mod Manager - Created by duy64. Licensed under the MIT License (see LICENSE.txt).
 #Requires -Version 5.1
 <#
-  PZ Mod Manager v437 - B42 Essentials: mod pack for Single-Player & Multiplayer
+  PZ Mod Manager v438 - B42 Essentials: mod pack for Single-Player & Multiplayer
   Full collection (~190 mods) + Cheat Menu: Rebuild, no Steam client needed.
 #>
 $ErrorActionPreference = 'Stop'
@@ -17,7 +17,7 @@ $NL          = [Environment]::NewLine
 # Target game build. B43 = change these lines; the layout repair and [10] checks derive from them.
 $GameBuild = '42'      # major build: version folder name (42/)
 $GameBuildFull = '42.21'  # current full build: versionMax floor for [10] warnings
-$ScriptVersion = '437'    # app version: shown in the menu header + GUI title
+$ScriptVersion = '438'    # app version: shown in the menu header + GUI title
 
 # All known categories, including ones with zero mods right now (Maps /
 # Audio / Zombies have no catalog mods yet). The category editor lists
@@ -273,7 +273,6 @@ $Mods = @(
   @{ Name='Improved Blood Effects'; WorkshopId='2648152698'; Cat='Content Mods' },
   @{ Name='Decoholic'; WorkshopId='3197857648'; Cat='Content Mods' },
   @{ Name='Dynamic Traits and Expanded Moodles'; WorkshopId='2459400130'; Cat='Content Mods' },
-  @{ Name="Pillow's Random Spawns [B42]"; WorkshopId='1911132112'; Cat='Content Mods' },
   @{ Name='[B42] Spawn with items by occupation'; WorkshopId='2747517727'; Cat='Content Mods' },
   @{ Name='Horse Mod [B42.20+/MP]'; WorkshopId='3661336777'; Cat='Content Mods' },
   @{ Name='I Am Bruce Lee Now'; WorkshopId='3791279212'; Cat='Content Mods' },
@@ -637,7 +636,7 @@ function Get-AllPacks([switch]$AllLists) {
   return $out
 }
 
-$script:RetiredWorkshopIds = @('3784151798','3780639614','3490188370','3526517370','3504753006','3607686447','3171815531')
+$script:RetiredWorkshopIds = @('3784151798','3780639614','3490188370','3526517370','3504753006','3607686447','3171815531','1911132112')
 function Set-ModsFromNamedList([string]$safe) {
   if (-not (Get-NamedListData $safe)) { return $false }
   $m = @()

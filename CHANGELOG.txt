@@ -1,6 +1,7 @@
 PZ MOD MANAGER - FULL CHANGELOG
 Created by duy64. Licensed under the MIT License (see LICENSE.txt).
 
+v438: Removed Pillow's Random Spawns (1911132112) from the catalog at the user's request - it no longer appears in any list, including on existing installs and fresh downloads (catalog entry removed and the Workshop ID retired).
 v437: Reset All Variant Choices is now also in the Tools menu, so it can be reached even when the Manage Variants window does not open (no mod needs a choice - exactly when a reset is wanted). The empty Manage Variants status now points to the Tools menu entry when stored choices exist.
 v436: Manage Variants now lists only mods that still need a version choice: a mod whose saved choice covers every current version leaves the list (it returns if a new version appears, or after Reset All Variant Choices clears its saved choice).
 v435: Manage Variants now lists only mods with a real version choice: dependency-linked module families and mods with a single build-matching version are no longer listed (nothing can ever be revised for them). The Manage Variants dialog gains a Reset All Variant Choices button, which clears every stored version choice after confirmation (installed folders are not touched; choices are asked again on the next install, update, or Manage Variants).
