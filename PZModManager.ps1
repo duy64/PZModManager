@@ -1,7 +1,7 @@
 # PZ Mod Manager - Created by duy64. Licensed under the MIT License (see LICENSE.txt).
 #Requires -Version 5.1
 <#
-  PZ Mod Manager v417 - B42 Essentials: mod pack for Single-Player & Multiplayer
+  PZ Mod Manager v418 - B42 Essentials: mod pack for Single-Player & Multiplayer
   Full collection (~190 mods) + Cheat Menu: Rebuild, no Steam client needed.
 #>
 $ErrorActionPreference = 'Stop'
@@ -17,7 +17,7 @@ $NL          = [Environment]::NewLine
 # Target game build. B43 = change these lines; the layout repair and [10] checks derive from them.
 $GameBuild = '42'      # major build: version folder name (42/)
 $GameBuildFull = '42.21'  # current full build: versionMax floor for [10] warnings
-$ScriptVersion = '417'    # app version: shown in the menu header + GUI title
+$ScriptVersion = '418'    # app version: shown in the menu header + GUI title
 
 # All known categories, including ones with zero mods right now (Maps /
 # Audio / Zombies have no catalog mods yet). The category editor lists
@@ -722,9 +722,10 @@ function Get-WorkshopItemStars([string]$id) {
   return 0
 }
 function Load-WorkshopRatings {
-  # Returns @{ Ratings; Fetched; Version }. Version 2 = TLS/user-agent
-  # fix (v410). Older files are treated as stale so the all-zeros
-  # cache from the broken scrape gets refetched once.
+  # Returns @{ Ratings; Fetched; Version }. Version 3 = truthful
+  # cache (v418): only successful scrapes are stored, so a cached 0
+  # means genuinely unrated. Older files are treated as stale so a
+  # poisoned all-zeros cache gets refetched once.
   $res = @{ Ratings = @{}; Fetched = ''; Version = 0 }
   if (Test-Path $WorkshopRatingsFile) {
     try {
@@ -752,7 +753,7 @@ function Start-WorkshopRatingsFetch($ids) {
   # Skips IDs already cached and fresh (7-day TTL).
   $cached = Load-WorkshopRatings
   $stale = $true
-  if ($cached.Version -ge 2 -and $cached.Fetched -ne '') {
+  if ($cached.Version -ge 3 -and $cached.Fetched -ne '') {
     try { if (((Get-Date) - [datetime]::ParseExact($cached.Fetched, 'yyyy-MM-dd', $null)).Days -le 7) { $stale = $false } } catch { }
   }
   $need = @()
@@ -795,8 +796,7 @@ function Start-WorkshopRatingsFetch($ids) {
             if ($attempt -lt 2) { Start-Sleep -Seconds 60 }
           }
         }
-        if ($ok) { $consecFail = 0 } else { $consecFail++ }
-        $ratings[[string]$wid] = $stars
+        if ($ok) { $consecFail = 0; $ratings[[string]$wid] = $stars } else { $consecFail++ }
         Start-Sleep -Milliseconds 2500
       }
       $dbg = @()
@@ -806,7 +806,7 @@ function Start-WorkshopRatingsFetch($ids) {
         # Manual JSON (no assemblies - JavaScriptSerializer is .NET
         # Framework only and ConvertTo-Json is unreliable for this).
         $jb = New-Object System.Text.StringBuilder
-        [void]$jb.Append('{"version":2,"fetched":"')
+        [void]$jb.Append('{"version":3,"fetched":"')
         [void]$jb.Append((Get-Date -Format 'yyyy-MM-dd'))
         [void]$jb.Append('","ratings":{')
         $first = $true
@@ -1251,6 +1251,27 @@ function Get-InstallMap {
 
 function Save-InstallMap($map) {
   $map | ConvertTo-Json -Depth 5 | Set-Content $MapPath -Encoding UTF8
+}
+
+function Get-ModDiskSize($folderNames) {
+  # Total bytes of a mod's installed folders (0 when none/missing).
+  $total = [long]0
+  foreach ($fn in @($folderNames)) {
+    $dir = Join-Path $ModsDir ([string]$fn)
+    if (-not (Test-Path $dir)) { continue }
+    $sum = (Get-ChildItem $dir -Recurse -File -ErrorAction SilentlyContinue | Measure-Object Length -Sum).Sum
+    if ($sum) { $total += [long]$sum }
+  }
+  return $total
+}
+
+function Format-ModSize([long]$bytes) {
+  # Human-readable size for the Mods tab Size column (blank for 0).
+  if ($bytes -le 0) { return '' }
+  if ($bytes -ge 1073741824) { return ('{0:N2} GB' -f ($bytes / 1073741824.0)) }
+  if ($bytes -ge 1048576) { return ('{0:N1} MB' -f ($bytes / 1048576.0)) }
+  if ($bytes -ge 1024) { return ('{0:N0} KB' -f ($bytes / 1024.0)) }
+  return ([string]$bytes + ' B')
 }
 
 function Get-ContentStamp($path) {
@@ -2196,6 +2217,7 @@ function Complete-InstallModCore([string]$WorkshopId, [string]$Name, $keptDirs, 
   $entry | Add-Member -NotePropertyName 'folders' -NotePropertyValue @($finalNames)
   $entry | Add-Member -NotePropertyName 'stamp' -NotePropertyValue $stamp
   $entry | Add-Member -NotePropertyName 'installed_on' -NotePropertyValue (Get-Date -Format 'yyyy-MM-dd')
+  $entry | Add-Member -NotePropertyName 'size' -NotePropertyValue (Get-ModDiskSize @($finalNames))
   if ($carryVariants) { $entry | Add-Member -NotePropertyName 'variants' -NotePropertyValue @($carryVariants) }
   $map | Add-Member -NotePropertyName $WorkshopId -NotePropertyValue $entry -Force
   Save-InstallMap $map
@@ -2806,6 +2828,7 @@ function Install-FoundUpdates($updates, $map) {
     $e | Add-Member -NotePropertyName 'folders' -NotePropertyValue @($finalNames)
     $e | Add-Member -NotePropertyName 'stamp' -NotePropertyValue $stamp
     $e | Add-Member -NotePropertyName 'installed_on' -NotePropertyValue (Get-Date -Format 'yyyy-MM-dd')
+    $e | Add-Member -NotePropertyName 'size' -NotePropertyValue (Get-ModDiskSize @($finalNames))
     if ($carryVariantsU) { $e | Add-Member -NotePropertyName 'variants' -NotePropertyValue @($carryVariantsU) }
     $map | Add-Member -NotePropertyName $id -NotePropertyValue $e -Force
     if (Test-NeedsZombieBuddyAgent $id) { $anyAgent = $true }
@@ -3983,6 +4006,11 @@ function Sort-GuiMods($list, $installed, $packNamesMap) {
     $key = { $dv = ''; if ($installed -contains [string]$_.WorkshopId) { if ($map -and $map.PSObject.Properties[[string]$_.WorkshopId]) { $v = $map.PSObject.Properties[[string]$_.WorkshopId].Value.installed_on; if ($v) { $dv = [string]$v } } }; $dv }
     if ($desc) { return @($list | Sort-Object $key, Name -Descending) } else { return @($list | Sort-Object $key, Name) }
   }
+  if ($col -eq 'Size') {
+    $map = Get-InstallMap
+    $key = { $sv = [long]0; if ($installed -contains [string]$_.WorkshopId) { if ($map -and $map.PSObject.Properties[[string]$_.WorkshopId]) { $e = $map.PSObject.Properties[[string]$_.WorkshopId].Value; if ($e.PSObject.Properties['size'] -and $e.size) { $sv = [long]$e.size } else { $sv = Get-ModDiskSize @($e.folders) } } }; $sv }
+    if ($desc) { return @($list | Sort-Object $key, Name -Descending) } else { return @($list | Sort-Object $key, Name) }
+  }
   return $list
 }
 
@@ -4052,6 +4080,7 @@ function Sort-GuiPackMemberRows($rows) {
   if ($col -eq 'Subscribers') { if ($desc) { return @($list | Sort-Object { [long]$_.Subscribers }, Name -Descending) } else { return @($list | Sort-Object { [long]$_.Subscribers }, Name) } }
   if ($col -eq 'Rating') { if ($desc) { return @($list | Sort-Object { [int]$_.Stars }, Name -Descending) } else { return @($list | Sort-Object { [int]$_.Stars }, Name) } }
   if ($col -eq 'Date') { if ($desc) { return @($list | Sort-Object { [string]$_.InstalledDate }, Name -Descending) } else { return @($list | Sort-Object { [string]$_.InstalledDate }, Name) } }
+  if ($col -eq 'Size') { if ($desc) { return @($list | Sort-Object { [long]$_.SizeBytes }, Name -Descending) } else { return @($list | Sort-Object { [long]$_.SizeBytes }, Name) } }
   if ($col -eq 'WorkshopId') { if ($desc) { return @($list | Sort-Object { [long]$_.WorkshopId }, Name -Descending) } else { return @($list | Sort-Object { [long]$_.WorkshopId }, Name) } }
   return ,$list
 }
@@ -4295,9 +4324,19 @@ function Refresh-GuiMods {
     # A not-installed mod keeps its install-map record (update
     # detection), but showing its stale date is misleading.
     $dateVal = ''
+    $sizeBytes = [long]0
     if ($isInstalled -and $installMap -and $installMap.PSObject.Properties[[string]$m.WorkshopId]) {
-      $dv = $installMap.PSObject.Properties[[string]$m.WorkshopId].Value.installed_on
+      $entry0 = $installMap.PSObject.Properties[[string]$m.WorkshopId].Value
+      $dv = $entry0.installed_on
       if ($dv) { $dateVal = [string]$dv }
+      # Size = stored at install/update; entries from before the
+      # Size column are measured once here and written back.
+      if ($entry0.PSObject.Properties['size'] -and $entry0.size) { $sizeBytes = [long]$entry0.size }
+      else {
+        $sizeBytes = Get-ModDiskSize @($entry0.folders)
+        $entry0 | Add-Member -NotePropertyName 'size' -NotePropertyValue $sizeBytes -Force
+        $script:GuiSizeBackfilled = $true
+      }
     }
     $items += [PSCustomObject]@{
       Name = [string]$m.Name
@@ -4307,10 +4346,13 @@ function Refresh-GuiMods {
       Subscribers = $(if ($stats -and $stats.ContainsKey([string]$m.WorkshopId)) { [long]$stats[[string]$m.WorkshopId].Subscribers } else { [long]0 })
       Rating = $(if ($stats -and $stats.ContainsKey([string]$m.WorkshopId)) { Format-Stars ([int]$stats[[string]$m.WorkshopId].Stars) } else { '' })
       Date = $dateVal
+      Size = (Format-ModSize $sizeBytes)
+      SizeBytes = [long]$sizeBytes
       Packs = $packNames
       IsChecked = $script:GuiSelectedMods.ContainsKey([string]$m.WorkshopId)
     }
   }
+  if ($script:GuiSizeBackfilled) { $script:GuiSizeBackfilled = $false; Save-InstallMap $installMap }
   $script:GuiModList.ItemsSource = $items
   # Header select-all checkbox (GridView checkbox column): checked = all
   # shown selected, unchecked = none, indeterminate = partial.
@@ -4327,8 +4369,8 @@ function Refresh-GuiMods {
   # GridView header sort indicators (reset to plain, then mark the sorted one).
   if ($script:GuiModList.View -and $script:GuiModList.View.Columns) {
     $gvCols = $script:GuiModList.View.Columns
-    $plain = @('Name', 'Category', 'Status', 'Workshop ID', 'Subscribers', 'Rating', 'Installed Date', 'Packs')
-    for ($i = 0; $i -lt 8 -and ($i + 1) -lt $gvCols.Count; $i++) { $gvCols[$i + 1].Header = $plain[$i] }
+    $plain = @('Name', 'Category', 'Status', 'Workshop ID', 'Subscribers', 'Rating', 'Installed Date', 'Size', 'Packs')
+    for ($i = 0; $i -lt 9 -and ($i + 1) -lt $gvCols.Count; $i++) { $gvCols[$i + 1].Header = $plain[$i] }
     if ($script:GuiModsSortColumn -eq 'Name') { $gvCols[1].Header = if ($script:GuiModsSortDescending) { 'Name (Z-A)' } else { 'Name (A-Z)' } }
     elseif ($script:GuiModsSortColumn -eq 'Category') { $gvCols[2].Header = if ($script:GuiModsSortDescending) { 'Category (Z-A)' } else { 'Category (A-Z)' } }
     elseif ($script:GuiModsSortColumn -eq 'Status') { $gvCols[3].Header = if ($script:GuiModsSortDescending) { 'Status (Not installed first)' } else { 'Status (Installed first)' } }
@@ -4336,7 +4378,8 @@ function Refresh-GuiMods {
     elseif ($script:GuiModsSortColumn -eq 'Date') { $gvCols[7].Header = if ($script:GuiModsSortDescending) { 'Installed Date (newest)' } else { 'Installed Date (oldest)' } }
     elseif ($script:GuiModsSortColumn -eq 'Subscribers') { $gvCols[5].Header = if ($script:GuiModsSortDescending) { 'Subscribers (9-0)' } else { 'Subscribers (0-9)' } }
     elseif ($script:GuiModsSortColumn -eq 'Rating') { $gvCols[6].Header = if ($script:GuiModsSortDescending) { 'Rating (9-0)' } else { 'Rating (0-9)' } }
-    elseif ($script:GuiModsSortColumn -eq 'Packs') { $gvCols[8].Header = if ($script:GuiModsSortDescending) { 'Packs (Z-A)' } else { 'Packs (A-Z)' } }
+    elseif ($script:GuiModsSortColumn -eq 'Size') { $gvCols[8].Header = if ($script:GuiModsSortDescending) { 'Size (9-0)' } else { 'Size (0-9)' } }
+    elseif ($script:GuiModsSortColumn -eq 'Packs') { $gvCols[9].Header = if ($script:GuiModsSortDescending) { 'Packs (Z-A)' } else { 'Packs (A-Z)' } }
   }
   $listName = ''
   $active = Get-ActiveListSafe
@@ -4745,9 +4788,12 @@ function Refresh-GuiPackDetail($pack) {
     if ($pStats -and $pStats.ContainsKey($pwid)) { $psubs = [long]$pStats[$pwid].Subscribers; $pstars = [int]$pStats[$pwid].Stars; $prate = Format-Stars $pstars }
     # Installed date (blank when not installed - same rule as Mods tab).
     $pdate = ''
+    $psize = [long]0
     if ($isInstalled -and $installMap -and $installMap.PSObject.Properties[$pwid]) {
-      $dv = $installMap.PSObject.Properties[$pwid].Value.installed_on
+      $pe = $installMap.PSObject.Properties[$pwid].Value
+      $dv = $pe.installed_on
       if ($dv) { $pdate = [string]$dv }
+      if ($pe.PSObject.Properties['size'] -and $pe.size) { $psize = [long]$pe.size } else { $psize = Get-ModDiskSize @($pe.folders) }
     }
     $items += [PSCustomObject]@{
       Name = [string]$m.Name
@@ -4757,6 +4803,8 @@ function Refresh-GuiPackDetail($pack) {
       Rating = $prate
       Stars = [int]$pstars
       InstalledDate = $pdate
+      Size = (Format-ModSize $psize)
+      SizeBytes = [long]$psize
       WorkshopId = $pwid
       IsChecked = $script:GuiSelectedMods.ContainsKey($pwid)
     }
@@ -4766,8 +4814,8 @@ function Refresh-GuiPackDetail($pack) {
   # Header sort indicators.
   if ($script:GuiPackMemberList.View -and $script:GuiPackMemberList.View.Columns) {
     $mpvCols = $script:GuiPackMemberList.View.Columns
-    $mpl = @('Name', 'Category', 'Status', 'Subscribers', 'Rating', 'Installed Date', 'Workshop ID')
-    for ($i = 0; $i -lt 7 -and ($i + 1) -lt $mpvCols.Count; $i++) { $mpvCols[$i + 1].Header = $mpl[$i] }
+    $mpl = @('Name', 'Category', 'Status', 'Subscribers', 'Rating', 'Installed Date', 'Size', 'Workshop ID')
+    for ($i = 0; $i -lt 8 -and ($i + 1) -lt $mpvCols.Count; $i++) { $mpvCols[$i + 1].Header = $mpl[$i] }
     $mc = $script:GuiPackMembersSortColumn; $md = $script:GuiPackMembersSortDescending
     if ($mc -eq 'Name') { $mpvCols[1].Header = if ($md) { 'Name (Z-A)' } else { 'Name (A-Z)' } }
     elseif ($mc -eq 'Category') { $mpvCols[2].Header = if ($md) { 'Category (Z-A)' } else { 'Category (A-Z)' } }
@@ -4775,7 +4823,8 @@ function Refresh-GuiPackDetail($pack) {
     elseif ($mc -eq 'Subscribers') { $mpvCols[4].Header = if ($md) { 'Subscribers (9-0)' } else { 'Subscribers (0-9)' } }
     elseif ($mc -eq 'Rating') { $mpvCols[5].Header = if ($md) { 'Rating (5-0)' } else { 'Rating (0-5)' } }
     elseif ($mc -eq 'Date') { $mpvCols[6].Header = if ($md) { 'Installed Date (newest)' } else { 'Installed Date (oldest)' } }
-    elseif ($mc -eq 'WorkshopId') { $mpvCols[7].Header = if ($md) { 'Workshop ID (9-0)' } else { 'Workshop ID (0-9)' } }
+    elseif ($mc -eq 'Size') { $mpvCols[7].Header = if ($md) { 'Size (9-0)' } else { 'Size (0-9)' } }
+    elseif ($mc -eq 'WorkshopId') { $mpvCols[8].Header = if ($md) { 'Workshop ID (9-0)' } else { 'Workshop ID (0-9)' } }
   }
   # Detail header select-all checkbox.
   if ($script:GuiPackMemberList.View -and $script:GuiPackMemberList.View.Columns -and $script:GuiPackMemberList.View.Columns.Count -gt 0) {
@@ -6719,13 +6768,14 @@ function Show-Gui {
                     </DataTemplate>
                   </GridViewColumn.CellTemplate>
                 </GridViewColumn>
-                <GridViewColumn Header="Name" Width="450" DisplayMemberBinding="{Binding Name}"/>
-                <GridViewColumn Header="Category" Width="150" DisplayMemberBinding="{Binding Category}"/>
+                <GridViewColumn Header="Name" Width="385" DisplayMemberBinding="{Binding Name}"/>
+                <GridViewColumn Header="Category" Width="140" DisplayMemberBinding="{Binding Category}"/>
                 <GridViewColumn Header="Status" Width="150" DisplayMemberBinding="{Binding Status}"/>
                 <GridViewColumn Header="Workshop ID" Width="150" DisplayMemberBinding="{Binding WorkshopId}"/>
-                <GridViewColumn Header="Subscribers" Width="140" DisplayMemberBinding="{Binding Subscribers, StringFormat='{}{0:N0}'}"/>
+                <GridViewColumn Header="Subscribers" Width="130" DisplayMemberBinding="{Binding Subscribers, StringFormat='{}{0:N0}'}"/>
                 <GridViewColumn Header="Rating" Width="100" DisplayMemberBinding="{Binding Rating}"/>
                 <GridViewColumn Header="Installed Date" Width="180" DisplayMemberBinding="{Binding Date}"/>
+                <GridViewColumn Header="Size" Width="100" DisplayMemberBinding="{Binding Size}"/>
                 <GridViewColumn HeaderContainerStyle="{StaticResource NoGripperHeader}" Header="Packs" Width="200" DisplayMemberBinding="{Binding Packs}"/>
               </GridView>
             </ListView.View>
@@ -6801,6 +6851,7 @@ function Show-Gui {
                 <GridViewColumn Header="Subscribers" Width="120" DisplayMemberBinding="{Binding Subscribers, StringFormat='{}{0:N0}'}"/>
                 <GridViewColumn Header="Rating" Width="100" DisplayMemberBinding="{Binding Rating}"/>
                 <GridViewColumn Header="Installed Date" Width="180" DisplayMemberBinding="{Binding InstalledDate}"/>
+                <GridViewColumn Header="Size" Width="100" DisplayMemberBinding="{Binding Size}"/>
                 <GridViewColumn HeaderContainerStyle="{StaticResource NoGripperHeader}" Header="Workshop ID" Width="150" DisplayMemberBinding="{Binding WorkshopId}"/>
               </GridView>
             </ListView.View>
@@ -7026,7 +7077,8 @@ function Show-Gui {
           elseif ($idx -eq 5) { $sortCol = 'Subscribers' }
           elseif ($idx -eq 6) { $sortCol = 'Rating' }
           elseif ($idx -eq 7) { $sortCol = 'Date' }
-          elseif ($idx -eq 8) { $sortCol = 'Packs' }
+          elseif ($idx -eq 8) { $sortCol = 'Size' }
+          elseif ($idx -eq 9) { $sortCol = 'Packs' }
           if ($sortCol) { Cycle-GuiModsSort $sortCol }
         }
       }
@@ -7118,7 +7170,8 @@ function Show-Gui {
           elseif ($idx -eq 4) { $sortCol = 'Subscribers' }
           elseif ($idx -eq 5) { $sortCol = 'Rating' }
           elseif ($idx -eq 6) { $sortCol = 'Date' }
-          elseif ($idx -eq 7) { $sortCol = 'WorkshopId' }
+          elseif ($idx -eq 7) { $sortCol = 'Size' }
+          elseif ($idx -eq 8) { $sortCol = 'WorkshopId' }
           if ($sortCol) { Cycle-GuiPackMembersSort $sortCol }
         }
       }

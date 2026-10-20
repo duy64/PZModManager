@@ -1,6 +1,7 @@
 PZ MOD MANAGER - FULL CHANGELOG
 Created by duy64. Licensed under the MIT License (see LICENSE.txt).
 
+v418: Size column on the Mods tab and the pack member table (installed size on disk, stored in the install map at install/update, sorted by bytes). Fixed star ratings cache poisoning: failed scrapes are no longer stored as 0 (only successful scrapes are cached, so a 0 now means genuinely unrated and failures retry on the next launch); the cache format is version 3 so a poisoned cache refetches once.
 v417: Install now verifies download completeness against the Workshop file size and re-downloads when the SteamCMD cache is truncated (a partial download previously installed as a bare mod.info for the 6244 models pack).
 v416: Categories can be renamed (Rename / Delete button on the Categories tab; mods and pack category references follow). Built-in packs can now be renamed, deleted, and have their description edited from the Packs tab Rename / Delete menu (applies to the active list; built-in packs are edited as a custom copy and deletions are remembered per list).
 v415: Pack Rename menu item now says '(custom packs only)' when disabled, so it is clear why rename is unavailable for built-in packs.
