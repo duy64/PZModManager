@@ -1,7 +1,7 @@
 # PZ Mod Manager - Created by duy64. Licensed under the MIT License (see LICENSE.txt).
 #Requires -Version 5.1
 <#
-  PZ Mod Manager v420 - B42 Essentials: mod pack for Single-Player & Multiplayer
+  PZ Mod Manager v421 - B42 Essentials: mod pack for Single-Player & Multiplayer
   Full collection (~190 mods) + Cheat Menu: Rebuild, no Steam client needed.
 #>
 $ErrorActionPreference = 'Stop'
@@ -17,7 +17,7 @@ $NL          = [Environment]::NewLine
 # Target game build. B43 = change these lines; the layout repair and [10] checks derive from them.
 $GameBuild = '42'      # major build: version folder name (42/)
 $GameBuildFull = '42.21'  # current full build: versionMax floor for [10] warnings
-$ScriptVersion = '420'    # app version: shown in the menu header + GUI title
+$ScriptVersion = '421'    # app version: shown in the menu header + GUI title
 
 # All known categories, including ones with zero mods right now (Maps /
 # Audio / Zombies have no catalog mods yet). The category editor lists
@@ -2971,7 +2971,7 @@ function Show-GuiWpfPicker([string]$title, [string]$instruction, $candidates, $c
     if ($result.Selected -eq $null -or @($result.Selected).Count -eq 0) { return [PSCustomObject]@{ Selected = @(); Failed = $false; NoCandidates = $false; CancelAll = $cancelAll } }
     return [PSCustomObject]@{ Selected = $result.Selected; Failed = $false; NoCandidates = $false; CancelAll = $cancelAll }
   } catch {
-    $script:LastPickerError = $_.Exception.Message
+    $script:LastPickerError = $_.Exception.Message + ' || STACK: ' + [string]$_.ScriptStackTrace
     return [PSCustomObject]@{ Selected = @(); Failed = $true; NoCandidates = $false; CancelAll = $false }
   }
 }
@@ -5379,7 +5379,7 @@ function Show-GuiWorkshopSearch {
     if ($result.Selected -eq $null -or @($result.Selected).Count -eq 0) { return [PSCustomObject]@{ Selected = @(); Failed = $false } }
     return [PSCustomObject]@{ Selected = $result.Selected; Failed = $false }
   } catch {
-    $script:LastPickerError = $_.Exception.Message
+    $script:LastPickerError = $_.Exception.Message + ' || STACK: ' + [string]$_.ScriptStackTrace
     return [PSCustomObject]@{ Selected = @(); Failed = $true }
   }
 }
@@ -7133,6 +7133,15 @@ function Show-Gui {
   } catch {
     Show-Console
     $err = $_
+    try {
+      $diag = @()
+      $diag += ('Date: ' + (Get-Date -Format 'yyyy-MM-dd HH:mm:ss'))
+      $diag += ('Type: ' + $err.Exception.GetType().FullName)
+      $diag += ('Message: ' + $err.Exception.Message)
+      $diag += 'Stack:'
+      $diag += [string]$err.ScriptStackTrace
+      ($diag -join [Environment]::NewLine) | Set-Content (Join-Path $PSScriptRoot 'gui-error.txt') -Encoding UTF8 -Force
+    } catch { }
     $script:GuiMode = $false
     Write-Host ('GUI error: ' + $err.Exception.Message) -ForegroundColor Red
     Pause

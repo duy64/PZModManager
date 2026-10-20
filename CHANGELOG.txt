@@ -1,6 +1,7 @@
 PZ MOD MANAGER - FULL CHANGELOG
 Created by duy64. Licensed under the MIT License (see LICENSE.txt).
 
+v421: Diagnostic build (no behavior change): the GUI error handler now writes the full exception and stack trace to gui-error.txt so a crash during install can be pinpointed.
 v420: Standardized dialog selection to match the main tabs: the Workshop Search dialog and the shared mod picker now use a header Select All checkbox instead of Select All / Deselect All buttons, the confirm button shows the selected count (for example Add Selected (3)) and is disabled when nothing is selected, and every checkbox change re-derives the button and header state. Add Selected with nothing selected can no longer close the dialog silently.
 v419: Added a Size column to the Mods tab and the pack member table (installed size on disk). Removed the Subscribers and Rating columns everywhere (Mods tab, pack members, Workshop Search) along with the Workshop stats fetch and the star-ratings background scrape.
 v418: Size column on the Mods tab and the pack member table (installed size on disk, stored in the install map at install/update, sorted by bytes). Fixed star ratings cache poisoning: failed scrapes are no longer stored as 0 (only successful scrapes are cached, so a 0 now means genuinely unrated and failures retry on the next launch); the cache format is version 3 so a poisoned cache refetches once.
