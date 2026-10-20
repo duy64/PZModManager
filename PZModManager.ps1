@@ -1,7 +1,7 @@
 # PZ Mod Manager - Created by duy64. Licensed under the MIT License (see LICENSE.txt).
 #Requires -Version 5.1
 <#
-  PZ Mod Manager v418 - B42 Essentials: mod pack for Single-Player & Multiplayer
+  PZ Mod Manager v419 - B42 Essentials: mod pack for Single-Player & Multiplayer
   Full collection (~190 mods) + Cheat Menu: Rebuild, no Steam client needed.
 #>
 $ErrorActionPreference = 'Stop'
@@ -17,7 +17,7 @@ $NL          = [Environment]::NewLine
 # Target game build. B43 = change these lines; the layout repair and [10] checks derive from them.
 $GameBuild = '42'      # major build: version folder name (42/)
 $GameBuildFull = '42.21'  # current full build: versionMax floor for [10] warnings
-$ScriptVersion = '418'    # app version: shown in the menu header + GUI title
+$ScriptVersion = '419'    # app version: shown in the menu header + GUI title
 
 # All known categories, including ones with zero mods right now (Maps /
 # Audio / Zombies have no catalog mods yet). The category editor lists
@@ -422,7 +422,6 @@ Apply-CategoryOverrides $script:DefaultBase
 $ListsDir = Join-Path $PSScriptRoot 'lists'
 $ActiveListFile = Join-Path $ListsDir 'active.txt'
 $ModNamesFile = Join-Path $PSScriptRoot 'mod-names.json'
-$WorkshopStatsFile = Join-Path $PSScriptRoot 'workshop-stats.json'
 
 function Get-SafeListName([string]$name) {
   $s = ([string]$name).Trim() -replace '[^A-Za-z0-9 _.-]', '_'
@@ -699,220 +698,8 @@ function Save-WorkshopNames {
   } catch { }
 }
 
-# Steam requires TLS 1.2+; PS 5.1 defaults to older protocols, which
-# silently breaks steamcommunity.com scrapes (empty ratings).
+# Steam requires TLS 1.2+; PS 5.1 defaults to older protocols.
 try { [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12 } catch { }
-$WorkshopRatingsFile = Join-Path $PSScriptRoot 'workshop-ratings.json'
-function Format-Stars([int]$stars) {
-  # 1-5 star display. 0 or negative = no rating data, show blank.
-  if ($stars -le 0) { return '' }
-  if ($stars -gt 5) { $stars = 5 }
-  $filled = [char]0x2605; $empty = [char]0x2606
-  return (([string]$filled * $stars) + ([string]$empty * (5 - $stars)))
-}
-function Get-WorkshopItemStars([string]$id) {
-  # Scrape the star rating from the mod's Workshop page. Steam's API
-  # does not expose ratings; the page HTML has e.g. 5-star_large.png.
-  # Returns 0-5, or 0 on failure / no rating.
-  try {
-    $r = Invoke-WebRequest -Uri ('https://steamcommunity.com/sharedfiles/filedetails/?id=' + $id) -Headers @{ 'User-Agent' = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Safari/537.36' } -UseBasicParsing -TimeoutSec 10 -ErrorAction Stop
-    $m = [regex]::Match([string]$r.Content, '(\d)-star_large\.png')
-    if ($m.Success) { $n = 0; if ([int]::TryParse($m.Groups[1].Value, [ref]$n) -and $n -ge 1 -and $n -le 5) { return $n } }
-  } catch { }
-  return 0
-}
-function Load-WorkshopRatings {
-  # Returns @{ Ratings; Fetched; Version }. Version 3 = truthful
-  # cache (v418): only successful scrapes are stored, so a cached 0
-  # means genuinely unrated. Older files are treated as stale so a
-  # poisoned all-zeros cache gets refetched once.
-  $res = @{ Ratings = @{}; Fetched = ''; Version = 0 }
-  if (Test-Path $WorkshopRatingsFile) {
-    try {
-      $d = Get-Content $WorkshopRatingsFile -Raw -ErrorAction Stop | ConvertFrom-Json
-      $res.Fetched = [string]$d.fetched
-      try { $res.Version = [int]$d.version } catch { }
-      foreach ($p in $d.ratings.PSObject.Properties) { $res.Ratings[[string]$p.Name] = [int]$p.Value }
-    } catch { }
-  }
-  return $res
-}
-function Save-WorkshopRatings($ratings) {
-  try {
-    $obj = New-Object PSObject
-    $obj | Add-Member -NotePropertyName 'fetched' -NotePropertyValue (Get-Date -Format 'yyyy-MM-dd')
-    $st = New-Object PSObject
-    foreach ($k in @($ratings.Keys | Sort-Object)) { $st | Add-Member -NotePropertyName $k -NotePropertyValue ([int]$ratings[$k]) }
-    $obj | Add-Member -NotePropertyName 'ratings' -NotePropertyValue $st
-    ($obj | ConvertTo-Json -Depth 3) | Set-Content $WorkshopRatingsFile -Encoding UTF8 -Force
-  } catch { }
-}
-function Start-WorkshopRatingsFetch($ids) {
-  # Background scrape of star ratings (does NOT block the UI). Writes
-  # workshop-ratings.json when done; the next list refresh picks it up.
-  # Skips IDs already cached and fresh (7-day TTL).
-  $cached = Load-WorkshopRatings
-  $stale = $true
-  if ($cached.Version -ge 3 -and $cached.Fetched -ne '') {
-    try { if (((Get-Date) - [datetime]::ParseExact($cached.Fetched, 'yyyy-MM-dd', $null)).Days -le 7) { $stale = $false } } catch { }
-  }
-  $need = @()
-  foreach ($id in @($ids)) { $s = [string]$id; if ($stale -or -not $cached.Ratings.ContainsKey($s)) { $need += $s } }
-  if ($need.Count -eq 0) { return }
-  # Merge existing fresh entries so the background job keeps them.
-  $existing = @{}
-  if (-not $stale) { foreach ($k in @($cached.Ratings.Keys)) { $existing[[string]$k] = [int]$cached.Ratings[$k] } }
-  try {
-    $rs = [runspacefactory]::CreateRunspace()
-    $rs.Open()
-    $ps = [powershell]::Create()
-    $ps.Runspace = $rs
-    $scriptBlock = {
-      param($needIds, $cacheFile, $existingRatings)
-      try { [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12 } catch { }
-      $ua = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Safari/537.36'
-      $ratings = @{}
-      $firstErr = ''
-      foreach ($k in @($existingRatings.Keys)) { $ratings[[string]$k] = [int]$existingRatings[$k] }
-      # Steam rate-limits after ~20 rapid requests (HTTP 429). Pace
-      # requests at ~2.5s apart; on failure wait 60s and retry once;
-      # abort the whole batch after 10 consecutive failures (likely
-      # already blocked - hammering only extends the block).
-      $consecFail = 0
-      foreach ($wid in $needIds) {
-        if ($consecFail -ge 10) { $firstErr = 'ABORTED after 10 consecutive failures (rate limit). Partial results kept.'; break }
-        $stars = 0
-        $attempt = 0
-        $ok = $false
-        while ($attempt -lt 2 -and -not $ok) {
-          $attempt++
-          try {
-            $r = Invoke-WebRequest -Uri ('https://steamcommunity.com/sharedfiles/filedetails/?id=' + $wid) -Headers @{ 'User-Agent' = $ua } -UseBasicParsing -TimeoutSec 10 -ErrorAction Stop
-            $m = [regex]::Match([string]$r.Content, '(\d)-star_large\.png')
-            if ($m.Success) { $n = 0; if ([int]::TryParse($m.Groups[1].Value, [ref]$n) -and $n -ge 1 -and $n -le 5) { $stars = $n } }
-            $ok = $true
-          } catch {
-            if ($firstErr -eq '') { $firstErr = $_.Exception.Message }
-            if ($attempt -lt 2) { Start-Sleep -Seconds 60 }
-          }
-        }
-        if ($ok) { $consecFail = 0; $ratings[[string]$wid] = $stars } else { $consecFail++ }
-        Start-Sleep -Milliseconds 2500
-      }
-      $dbg = @()
-      $dbg += ((Get-Date -Format 'yyyy-MM-dd HH:mm:ss') + ' scraped ' + $ratings.Count + ' ids')
-      if ($firstErr -ne '') { $dbg += ('FIRST ERROR: ' + $firstErr) }
-      try {
-        # Manual JSON (no assemblies - JavaScriptSerializer is .NET
-        # Framework only and ConvertTo-Json is unreliable for this).
-        $jb = New-Object System.Text.StringBuilder
-        [void]$jb.Append('{"version":3,"fetched":"')
-        [void]$jb.Append((Get-Date -Format 'yyyy-MM-dd'))
-        [void]$jb.Append('","ratings":{')
-        $first = $true
-        foreach ($rk in @($ratings.Keys | Sort-Object)) {
-          if (-not $first) { [void]$jb.Append(',') }
-          $first = $false
-          [void]$jb.Append('"')
-          [void]$jb.Append([string]$rk)
-          [void]$jb.Append('":')
-          [void]$jb.Append([string]([int]$ratings[$rk]))
-        }
-        [void]$jb.Append('}}')
-        [System.IO.File]::WriteAllText($cacheFile, $jb.ToString(), [System.Text.Encoding]::UTF8)
-        $dbg += 'wrote ' + $cacheFile
-      } catch {
-        $dbg += ('WRITE FAILED: ' + $_.Exception.Message)
-      }
-      try { [System.IO.File]::WriteAllLines([System.IO.Path]::ChangeExtension($cacheFile, '.debug.txt'), $dbg, [System.Text.Encoding]::UTF8) } catch { }
-    }
-    [void]$ps.AddScript($scriptBlock).AddParameters(@{ needIds = $need; cacheFile = $WorkshopRatingsFile; existingRatings = $existing })
-    $handle = $ps.BeginInvoke()
-    $script:RatingsFetchJob = @{ PS = $ps; Handle = $handle; Runspace = $rs }
-  } catch { }
-}
-
-function Get-WorkshopStats($ids) {
-  # Subscribers + ratings per Workshop ID. File cache workshop-stats.json
-  # (7-day TTL) + in-memory cache per session. Missing/stale entries are
-  # fetched via GetPublishedFileDetails (batched, 100 per call).
-  # Offline/API failure -> use cache or zeros.
-  # Returns a hashtable WorkshopId -> PSCustomObject(Subscribers, Stars).
-  # Stars is 0-5 from the workshop page scrape (0 = no data yet). Ratings
-  # live in workshop-ratings.json (own 7-day TTL), fetched in background.
-  if ($script:WorkshopStats -eq $null) {
-    $script:WorkshopStats = @{}
-    $script:WorkshopStatsFetched = ''
-    if (Test-Path $WorkshopStatsFile) {
-      try {
-        $d = Get-Content $WorkshopStatsFile -Raw -ErrorAction Stop | ConvertFrom-Json
-        $script:WorkshopStatsFetched = [string]$d.fetched
-        foreach ($p in $d.stats.PSObject.Properties) {
-          $v = $p.Value
-          if ($v -is [long] -or $v -is [int]) {
-            # Legacy cache format (subscribers only) - migrate.
-            $script:WorkshopStats[[string]$p.Name] = [PSCustomObject]@{ Subscribers = [long]$v; Score = [double]0; VotesUp = [long]0; VotesDown = [long]0 }
-          } else {
-            $script:WorkshopStats[[string]$p.Name] = [PSCustomObject]@{ Subscribers = [long]$v.subscribers; Score = [double]$v.score; VotesUp = [long]$v.votesUp; VotesDown = [long]$v.votesDown }
-          }
-        }
-      } catch { }
-    }
-  }
-  $stale = $true
-  if ($script:WorkshopStatsFetched -ne '') {
-    try { if (((Get-Date) - [datetime]::ParseExact($script:WorkshopStatsFetched, 'yyyy-MM-dd', $null)).Days -le 7) { $stale = $false } } catch { }
-  }
-  $needFetch = @()
-  foreach ($id in @($ids)) { if (-not $script:WorkshopStats.ContainsKey([string]$id) -or $stale) { $needFetch += [string]$id } }
-  if ($needFetch.Count -gt 0) {
-    for ($b = 0; $b -lt $needFetch.Count; $b += 100) {
-      $end = [Math]::Min($b + 99, $needFetch.Count - 1)
-      $batch = @($needFetch[$b..$end])
-      $body = 'itemcount=' + $batch.Count
-      for ($k = 0; $k -lt $batch.Count; $k++) { $body += '&publishedfileids[' + $k + ']=' + $batch[$k] }
-      try {
-        $r = Invoke-WebRequest -Uri 'https://api.steampowered.com/ISteamRemoteStorage/GetPublishedFileDetails/v1/' -Method Post -Body $body -ContentType 'application/x-www-form-urlencoded' -UseBasicParsing -TimeoutSec 5 -ErrorAction Stop
-        $d = $r.Content | ConvertFrom-Json
-        foreach ($item in @($d.response.publishedfiledetails)) {
-          $wid = [string]$item.publishedfileid
-          $subs = 0
-          try { $subs = [long]$item.subscriptions } catch { }
-          $script:WorkshopStats[$wid] = [PSCustomObject]@{ Subscribers = $subs; Score = [double]0; VotesUp = [long]0; VotesDown = [long]0 }
-        }
-      } catch { }
-    }
-    $script:WorkshopStatsFetched = (Get-Date -Format 'yyyy-MM-dd')
-    try {
-      $obj = New-Object PSObject
-      $obj | Add-Member -NotePropertyName 'fetched' -NotePropertyValue $script:WorkshopStatsFetched
-      $st = New-Object PSObject
-      foreach ($k in @($script:WorkshopStats.Keys | Sort-Object)) {
-        $sv = $script:WorkshopStats[$k]
-        $svObj = New-Object PSObject
-        $svObj | Add-Member -NotePropertyName 'subscribers' -NotePropertyValue ([long]$sv.Subscribers)
-        $svObj | Add-Member -NotePropertyName 'score' -NotePropertyValue ([double]$sv.Score)
-        $svObj | Add-Member -NotePropertyName 'votesUp' -NotePropertyValue ([long]$sv.VotesUp)
-        $svObj | Add-Member -NotePropertyName 'votesDown' -NotePropertyValue ([long]$sv.VotesDown)
-        $st | Add-Member -NotePropertyName $k -NotePropertyValue $svObj
-      }
-      $obj | Add-Member -NotePropertyName 'stats' -NotePropertyValue $st
-      ($obj | ConvertTo-Json -Depth 3) | Set-Content $WorkshopStatsFile -Encoding UTF8 -Force
-    } catch { }
-  }
-  # Merge star ratings (cheap file read; background job keeps it fresh).
-  try {
-    $rc = Load-WorkshopRatings
-    foreach ($k in @($script:WorkshopStats.Keys)) {
-      $stars = 0
-      if ($rc.Ratings.ContainsKey([string]$k)) { $stars = [int]$rc.Ratings[[string]$k] }
-      $sv = $script:WorkshopStats[$k]
-      $script:WorkshopStats[$k] = [PSCustomObject]@{ Subscribers = [long]$sv.Subscribers; Stars = $stars }
-    }
-  } catch { }
-  return $script:WorkshopStats
-}
-
 function Get-WorkshopModCategories($ids) {
   # Batched Steam lookup: WorkshopId -> Steam-tag category
   # (Get-SteamTagCategory on the item's tags). One API call per 100
@@ -3985,18 +3772,6 @@ function Sort-GuiMods($list, $installed, $packNamesMap) {
     $key = { $v = 0; [void][long]::TryParse([string]$_.WorkshopId, [ref]$v); $v }
     if ($desc) { return @($list | Sort-Object $key, Name -Descending) } else { return @($list | Sort-Object $key, Name) }
   }
-  if ($col -eq 'Subscribers') {
-    # NOTE: this sorts the RAW mods (no Subscribers property yet - rows
-    # get it after the sort), so read the stats cache directly.
-    $stats = Get-WorkshopStats
-    $key = { $v = [long]0; if ($stats -and $stats.ContainsKey([string]$_.WorkshopId)) { try { $v = [long]$stats[[string]$_.WorkshopId].Subscribers } catch { } }; $v }
-    if ($desc) { return @($list | Sort-Object $key, Name -Descending) } else { return @($list | Sort-Object $key, Name) }
-  }
-  if ($col -eq 'Rating') {
-    $stats = Get-WorkshopStats
-    $key = { $v = [int]0; if ($stats -and $stats.ContainsKey([string]$_.WorkshopId)) { try { $v = [int]$stats[[string]$_.WorkshopId].Stars } catch { } }; $v }
-    if ($desc) { return @($list | Sort-Object $key, Name -Descending) } else { return @($list | Sort-Object $key, Name) }
-  }
   if ($col -eq 'Packs') {
     $key = { $pn = ''; if ($packNamesMap -and $packNamesMap.ContainsKey([string]$_.WorkshopId)) { $pn = [string]$packNamesMap[[string]$_.WorkshopId] }; $pn }
     if ($desc) { return @($list | Sort-Object $key, Name -Descending) } else { return @($list | Sort-Object $key, Name) }
@@ -4077,8 +3852,6 @@ function Sort-GuiPackMemberRows($rows) {
   if ($col -eq 'Name') { if ($desc) { return @($list | Sort-Object Name -Descending) } else { return @($list | Sort-Object Name) } }
   if ($col -eq 'Category') { if ($desc) { return @($list | Sort-Object Category, Name -Descending) } else { return @($list | Sort-Object Category, Name) } }
   if ($col -eq 'Status') { if ($desc) { return @($list | Sort-Object Status, Name -Descending) } else { return @($list | Sort-Object Status, Name) } }
-  if ($col -eq 'Subscribers') { if ($desc) { return @($list | Sort-Object { [long]$_.Subscribers }, Name -Descending) } else { return @($list | Sort-Object { [long]$_.Subscribers }, Name) } }
-  if ($col -eq 'Rating') { if ($desc) { return @($list | Sort-Object { [int]$_.Stars }, Name -Descending) } else { return @($list | Sort-Object { [int]$_.Stars }, Name) } }
   if ($col -eq 'Date') { if ($desc) { return @($list | Sort-Object { [string]$_.InstalledDate }, Name -Descending) } else { return @($list | Sort-Object { [string]$_.InstalledDate }, Name) } }
   if ($col -eq 'Size') { if ($desc) { return @($list | Sort-Object { [long]$_.SizeBytes }, Name -Descending) } else { return @($list | Sort-Object { [long]$_.SizeBytes }, Name) } }
   if ($col -eq 'WorkshopId') { if ($desc) { return @($list | Sort-Object { [long]$_.WorkshopId }, Name -Descending) } else { return @($list | Sort-Object { [long]$_.WorkshopId }, Name) } }
@@ -4311,7 +4084,6 @@ function Refresh-GuiMods {
   $script:GuiModsShownIds = @{}
   foreach ($m in $display) { $script:GuiModsShownIds[[string]$m.WorkshopId] = $true }
   $installMap = Get-InstallMap
-  $stats = Get-WorkshopStats @($display | ForEach-Object { [string]$_.WorkshopId })
   $items = @()
   foreach ($m in $display) {
     $isInstalled = $installed -contains [string]$m.WorkshopId
@@ -4343,8 +4115,6 @@ function Refresh-GuiMods {
       Category = [string]$m.Cat
       Status = $status
       WorkshopId = [string]$m.WorkshopId
-      Subscribers = $(if ($stats -and $stats.ContainsKey([string]$m.WorkshopId)) { [long]$stats[[string]$m.WorkshopId].Subscribers } else { [long]0 })
-      Rating = $(if ($stats -and $stats.ContainsKey([string]$m.WorkshopId)) { Format-Stars ([int]$stats[[string]$m.WorkshopId].Stars) } else { '' })
       Date = $dateVal
       Size = (Format-ModSize $sizeBytes)
       SizeBytes = [long]$sizeBytes
@@ -4369,17 +4139,15 @@ function Refresh-GuiMods {
   # GridView header sort indicators (reset to plain, then mark the sorted one).
   if ($script:GuiModList.View -and $script:GuiModList.View.Columns) {
     $gvCols = $script:GuiModList.View.Columns
-    $plain = @('Name', 'Category', 'Status', 'Workshop ID', 'Subscribers', 'Rating', 'Installed Date', 'Size', 'Packs')
-    for ($i = 0; $i -lt 9 -and ($i + 1) -lt $gvCols.Count; $i++) { $gvCols[$i + 1].Header = $plain[$i] }
+    $plain = @('Name', 'Category', 'Status', 'Workshop ID', 'Installed Date', 'Size', 'Packs')
+    for ($i = 0; $i -lt 7 -and ($i + 1) -lt $gvCols.Count; $i++) { $gvCols[$i + 1].Header = $plain[$i] }
     if ($script:GuiModsSortColumn -eq 'Name') { $gvCols[1].Header = if ($script:GuiModsSortDescending) { 'Name (Z-A)' } else { 'Name (A-Z)' } }
     elseif ($script:GuiModsSortColumn -eq 'Category') { $gvCols[2].Header = if ($script:GuiModsSortDescending) { 'Category (Z-A)' } else { 'Category (A-Z)' } }
     elseif ($script:GuiModsSortColumn -eq 'Status') { $gvCols[3].Header = if ($script:GuiModsSortDescending) { 'Status (Not installed first)' } else { 'Status (Installed first)' } }
     elseif ($script:GuiModsSortColumn -eq 'WorkshopId') { $gvCols[4].Header = if ($script:GuiModsSortDescending) { 'Workshop ID (9-0)' } else { 'Workshop ID (0-9)' } }
-    elseif ($script:GuiModsSortColumn -eq 'Date') { $gvCols[7].Header = if ($script:GuiModsSortDescending) { 'Installed Date (newest)' } else { 'Installed Date (oldest)' } }
-    elseif ($script:GuiModsSortColumn -eq 'Subscribers') { $gvCols[5].Header = if ($script:GuiModsSortDescending) { 'Subscribers (9-0)' } else { 'Subscribers (0-9)' } }
-    elseif ($script:GuiModsSortColumn -eq 'Rating') { $gvCols[6].Header = if ($script:GuiModsSortDescending) { 'Rating (9-0)' } else { 'Rating (0-9)' } }
-    elseif ($script:GuiModsSortColumn -eq 'Size') { $gvCols[8].Header = if ($script:GuiModsSortDescending) { 'Size (9-0)' } else { 'Size (0-9)' } }
-    elseif ($script:GuiModsSortColumn -eq 'Packs') { $gvCols[9].Header = if ($script:GuiModsSortDescending) { 'Packs (Z-A)' } else { 'Packs (A-Z)' } }
+    elseif ($script:GuiModsSortColumn -eq 'Date') { $gvCols[5].Header = if ($script:GuiModsSortDescending) { 'Installed Date (newest)' } else { 'Installed Date (oldest)' } }
+    elseif ($script:GuiModsSortColumn -eq 'Size') { $gvCols[6].Header = if ($script:GuiModsSortDescending) { 'Size (9-0)' } else { 'Size (0-9)' } }
+    elseif ($script:GuiModsSortColumn -eq 'Packs') { $gvCols[7].Header = if ($script:GuiModsSortDescending) { 'Packs (Z-A)' } else { 'Packs (A-Z)' } }
   }
   $listName = ''
   $active = Get-ActiveListSafe
@@ -4778,14 +4546,10 @@ function Refresh-GuiPackDetail($pack) {
   $installed = @(Get-InstalledWorkshopIds)
   $installMap = Get-InstallMap
   $members = @(Get-PackModsFull $pack)
-  $pStats = Get-WorkshopStats @($members | ForEach-Object { [string]$_.WorkshopId })
   $items = @()
   foreach ($m in $members) {
     $isInstalled = $installed -contains [string]$m.WorkshopId
     $pwid = [string]$m.WorkshopId
-    $psubs = [long]0; $prate = ''
-    $pstars = 0
-    if ($pStats -and $pStats.ContainsKey($pwid)) { $psubs = [long]$pStats[$pwid].Subscribers; $pstars = [int]$pStats[$pwid].Stars; $prate = Format-Stars $pstars }
     # Installed date (blank when not installed - same rule as Mods tab).
     $pdate = ''
     $psize = [long]0
@@ -4799,9 +4563,6 @@ function Refresh-GuiPackDetail($pack) {
       Name = [string]$m.Name
       Category = [string]$m.Cat
       Status = if ($isInstalled) { 'Installed' } else { 'Not installed' }
-      Subscribers = $psubs
-      Rating = $prate
-      Stars = [int]$pstars
       InstalledDate = $pdate
       Size = (Format-ModSize $psize)
       SizeBytes = [long]$psize
@@ -4814,17 +4575,15 @@ function Refresh-GuiPackDetail($pack) {
   # Header sort indicators.
   if ($script:GuiPackMemberList.View -and $script:GuiPackMemberList.View.Columns) {
     $mpvCols = $script:GuiPackMemberList.View.Columns
-    $mpl = @('Name', 'Category', 'Status', 'Subscribers', 'Rating', 'Installed Date', 'Size', 'Workshop ID')
-    for ($i = 0; $i -lt 8 -and ($i + 1) -lt $mpvCols.Count; $i++) { $mpvCols[$i + 1].Header = $mpl[$i] }
+    $mpl = @('Name', 'Category', 'Status', 'Installed Date', 'Size', 'Workshop ID')
+    for ($i = 0; $i -lt 6 -and ($i + 1) -lt $mpvCols.Count; $i++) { $mpvCols[$i + 1].Header = $mpl[$i] }
     $mc = $script:GuiPackMembersSortColumn; $md = $script:GuiPackMembersSortDescending
     if ($mc -eq 'Name') { $mpvCols[1].Header = if ($md) { 'Name (Z-A)' } else { 'Name (A-Z)' } }
     elseif ($mc -eq 'Category') { $mpvCols[2].Header = if ($md) { 'Category (Z-A)' } else { 'Category (A-Z)' } }
     elseif ($mc -eq 'Status') { $mpvCols[3].Header = if ($md) { 'Status (Not installed first)' } else { 'Status (Installed first)' } }
-    elseif ($mc -eq 'Subscribers') { $mpvCols[4].Header = if ($md) { 'Subscribers (9-0)' } else { 'Subscribers (0-9)' } }
-    elseif ($mc -eq 'Rating') { $mpvCols[5].Header = if ($md) { 'Rating (5-0)' } else { 'Rating (0-5)' } }
-    elseif ($mc -eq 'Date') { $mpvCols[6].Header = if ($md) { 'Installed Date (newest)' } else { 'Installed Date (oldest)' } }
-    elseif ($mc -eq 'Size') { $mpvCols[7].Header = if ($md) { 'Size (9-0)' } else { 'Size (0-9)' } }
-    elseif ($mc -eq 'WorkshopId') { $mpvCols[8].Header = if ($md) { 'Workshop ID (9-0)' } else { 'Workshop ID (0-9)' } }
+    elseif ($mc -eq 'Date') { $mpvCols[4].Header = if ($md) { 'Installed Date (newest)' } else { 'Installed Date (oldest)' } }
+    elseif ($mc -eq 'Size') { $mpvCols[5].Header = if ($md) { 'Size (9-0)' } else { 'Size (0-9)' } }
+    elseif ($mc -eq 'WorkshopId') { $mpvCols[6].Header = if ($md) { 'Workshop ID (9-0)' } else { 'Workshop ID (0-9)' } }
   }
   # Detail header select-all checkbox.
   if ($script:GuiPackMemberList.View -and $script:GuiPackMemberList.View.Columns -and $script:GuiPackMemberList.View.Columns.Count -gt 0) {
@@ -5513,9 +5272,7 @@ function Show-GuiWorkshopSearch {
     $gridView = $window.FindName('SearchGridView')
     $checkTpl = [System.Windows.Markup.XamlReader]::Parse('<DataTemplate xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"><CheckBox IsChecked="{Binding IsChecked}" HorizontalAlignment="Center" VerticalAlignment="Center"/></DataTemplate>')
     Build-StandardGridColumns $gridView @(
-      @{ Header = 'Name'; Property = 'Name'; Width = 440 },
-      @{ Header = 'Subscribers'; Property = 'Subscribers'; Width = 120 },
-      @{ Header = 'Rating'; Property = 'Rating'; Width = 80 },
+      @{ Header = 'Name'; Property = 'Name'; Width = 560 },
       @{ Header = 'Workshop ID'; Property = 'WorkshopId'; Width = 280 }
     ) $checkTpl $window.FindResource('NoGripperHeader')
     Register-LastColumnFill $listView
@@ -5561,13 +5318,8 @@ function Show-GuiWorkshopSearch {
         else { $window.FindName('SearchInstruction').Text = ('No results for "' + $q.Trim() + '".') }
         $state.Rows = @()
       } else {
-        Start-WorkshopRatingsFetch @($found | ForEach-Object { [string]$_.WorkshopId })
-        $sStats = Get-WorkshopStats @($found | ForEach-Object { [string]$_.WorkshopId })
         $state.Rows = @($found | ForEach-Object {
-          $swid = [string]$_.WorkshopId
-          $ssubs = [long]0; $srate = ''
-          if ($sStats -and $sStats.ContainsKey($swid)) { $ssubs = [long]$sStats[$swid].Subscribers; $srate = Format-Stars ([int]$sStats[$swid].Stars) }
-          [PSCustomObject]@{ IsChecked = $true; Name = [string]$_.Name; Subscribers = $ssubs; Rating = $srate; WorkshopId = $swid }
+          [PSCustomObject]@{ IsChecked = $true; Name = [string]$_.Name; WorkshopId = [string]$_.WorkshopId }
         })
         $window.FindName('SearchInstruction').Text = ('Found ' + $found.Count.ToString() + ' result(s) - tick the mods to add.')
       }
@@ -5582,13 +5334,8 @@ function Show-GuiWorkshopSearch {
         else { $window.FindName('SearchInstruction').Text = 'No popular mods found.' }
         $state.Rows = @()
       } else {
-        Start-WorkshopRatingsFetch @($found | ForEach-Object { [string]$_.WorkshopId })
-        $sStats = Get-WorkshopStats @($found | ForEach-Object { [string]$_.WorkshopId })
         $state.Rows = @($found | ForEach-Object {
-          $swid = [string]$_.WorkshopId
-          $ssubs = [long]0; $srate = ''
-          if ($sStats -and $sStats.ContainsKey($swid)) { $ssubs = [long]$sStats[$swid].Subscribers; $srate = Format-Stars ([int]$sStats[$swid].Stars) }
-          [PSCustomObject]@{ IsChecked = $true; Name = [string]$_.Name; Subscribers = $ssubs; Rating = $srate; WorkshopId = $swid }
+          [PSCustomObject]@{ IsChecked = $true; Name = [string]$_.Name; WorkshopId = [string]$_.WorkshopId }
         })
         $window.FindName('SearchInstruction').Text = ('Found ' + $found.Count.ToString() + ' popular mod(s) - tick the mods to add. (Ranked by relevance, not subscriptions.)')
       }
@@ -6768,12 +6515,10 @@ function Show-Gui {
                     </DataTemplate>
                   </GridViewColumn.CellTemplate>
                 </GridViewColumn>
-                <GridViewColumn Header="Name" Width="385" DisplayMemberBinding="{Binding Name}"/>
-                <GridViewColumn Header="Category" Width="140" DisplayMemberBinding="{Binding Category}"/>
+                <GridViewColumn Header="Name" Width="450" DisplayMemberBinding="{Binding Name}"/>
+                <GridViewColumn Header="Category" Width="150" DisplayMemberBinding="{Binding Category}"/>
                 <GridViewColumn Header="Status" Width="150" DisplayMemberBinding="{Binding Status}"/>
                 <GridViewColumn Header="Workshop ID" Width="150" DisplayMemberBinding="{Binding WorkshopId}"/>
-                <GridViewColumn Header="Subscribers" Width="130" DisplayMemberBinding="{Binding Subscribers, StringFormat='{}{0:N0}'}"/>
-                <GridViewColumn Header="Rating" Width="100" DisplayMemberBinding="{Binding Rating}"/>
                 <GridViewColumn Header="Installed Date" Width="180" DisplayMemberBinding="{Binding Date}"/>
                 <GridViewColumn Header="Size" Width="100" DisplayMemberBinding="{Binding Size}"/>
                 <GridViewColumn HeaderContainerStyle="{StaticResource NoGripperHeader}" Header="Packs" Width="200" DisplayMemberBinding="{Binding Packs}"/>
@@ -6848,8 +6593,6 @@ function Show-Gui {
                 <GridViewColumn Header="Name" Width="400" DisplayMemberBinding="{Binding Name}"/>
                 <GridViewColumn Header="Category" Width="150" DisplayMemberBinding="{Binding Category}"/>
                 <GridViewColumn Header="Status" Width="150" DisplayMemberBinding="{Binding Status}"/>
-                <GridViewColumn Header="Subscribers" Width="120" DisplayMemberBinding="{Binding Subscribers, StringFormat='{}{0:N0}'}"/>
-                <GridViewColumn Header="Rating" Width="100" DisplayMemberBinding="{Binding Rating}"/>
                 <GridViewColumn Header="Installed Date" Width="180" DisplayMemberBinding="{Binding InstalledDate}"/>
                 <GridViewColumn Header="Size" Width="100" DisplayMemberBinding="{Binding Size}"/>
                 <GridViewColumn HeaderContainerStyle="{StaticResource NoGripperHeader}" Header="Workshop ID" Width="150" DisplayMemberBinding="{Binding WorkshopId}"/>
@@ -7074,11 +6817,9 @@ function Show-Gui {
           elseif ($idx -eq 2) { $sortCol = 'Category' }
           elseif ($idx -eq 3) { $sortCol = 'Status' }
           elseif ($idx -eq 4) { $sortCol = 'WorkshopId' }
-          elseif ($idx -eq 5) { $sortCol = 'Subscribers' }
-          elseif ($idx -eq 6) { $sortCol = 'Rating' }
-          elseif ($idx -eq 7) { $sortCol = 'Date' }
-          elseif ($idx -eq 8) { $sortCol = 'Size' }
-          elseif ($idx -eq 9) { $sortCol = 'Packs' }
+          elseif ($idx -eq 5) { $sortCol = 'Date' }
+          elseif ($idx -eq 6) { $sortCol = 'Size' }
+          elseif ($idx -eq 7) { $sortCol = 'Packs' }
           if ($sortCol) { Cycle-GuiModsSort $sortCol }
         }
       }
@@ -7167,11 +6908,9 @@ function Show-Gui {
           if ($idx -eq 1) { $sortCol = 'Name' }
           elseif ($idx -eq 2) { $sortCol = 'Category' }
           elseif ($idx -eq 3) { $sortCol = 'Status' }
-          elseif ($idx -eq 4) { $sortCol = 'Subscribers' }
-          elseif ($idx -eq 5) { $sortCol = 'Rating' }
-          elseif ($idx -eq 6) { $sortCol = 'Date' }
-          elseif ($idx -eq 7) { $sortCol = 'Size' }
-          elseif ($idx -eq 8) { $sortCol = 'WorkshopId' }
+          elseif ($idx -eq 4) { $sortCol = 'Date' }
+          elseif ($idx -eq 5) { $sortCol = 'Size' }
+          elseif ($idx -eq 6) { $sortCol = 'WorkshopId' }
           if ($sortCol) { Cycle-GuiPackMembersSort $sortCol }
         }
       }
@@ -7366,34 +7105,6 @@ function Show-Gui {
     Update-GuiListSelectionButtons
     Update-GuiWorkshopButtons
     $script:GuiWindow.Title = 'PZ Mod Manager v' + $ScriptVersion + ' - Project Zomboid B' + $GameBuildFull
-    # Star ratings: scrape missing/stale entries in the background
-    # (Steam API does not expose them). Next refresh picks them up.
-    Start-WorkshopRatingsFetch @($Mods | ForEach-Object { [string]$_.WorkshopId })
-    # Auto-refresh when the background ratings job finishes (the UI does
-    # not pick up the file on its own - without this the stars never
-    # appear unless the user triggers a refresh manually).
-    if ($script:RatingsFetchJob) {
-      Set-GuiTransientStatus 'Fetching star ratings in the background...' 8
-      $rtTimer = New-Object System.Windows.Threading.DispatcherTimer
-      $rtTimer.Interval = [TimeSpan]::FromSeconds(20)
-      $rtTimer.Add_Tick({
-        try {
-          $job = $script:RatingsFetchJob
-          if (-not $job) { $script:RatingsTimer.Stop(); return }
-          if ($job.Handle.AsyncWaitHandle.WaitOne(0)) {
-            $script:RatingsTimer.Stop()
-            try { [void]$job.PS.EndInvoke($job.Handle) } catch { }
-            try { $job.PS.Dispose() } catch { }
-            try { $job.Runspace.Close() } catch { }
-            $script:RatingsFetchJob = $null
-            Refresh-GuiMods
-            Set-GuiTransientStatus 'Star ratings updated.' 5
-          }
-        } catch { try { $script:RatingsTimer.Stop() } catch { } }
-      })
-      $script:RatingsTimer = $rtTimer
-      $rtTimer.Start()
-    }
     Set-GuiWindowIcon
     if ($script:StartupAdoptSummary) { Set-GuiTransientStatus $script:StartupAdoptSummary 15 }
     [void]$script:GuiWindow.ShowDialog()
