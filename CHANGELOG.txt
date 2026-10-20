@@ -1,6 +1,7 @@
 PZ MOD MANAGER - FULL CHANGELOG
 Created by duy64. Licensed under the MIT License (see LICENSE.txt).
 
+v431: Fixed a crash in the consolidated version picker (Cannot convert value 'of'): the Kept column text was built by adding a string to an integer count, which PowerShell rejects. Both places (picker rows and the Kept column refresh) now use the format operator. Reproduced exactly before shipping.
 v430: Dependency database: TchernoLib (Workshop 3389605231) is now resolvable, and Infirmities is recorded as requiring Moodle Framework + TchernoLib - installing Infirmities now pulls TchernoLib in automatically instead of reporting it as an unknown dependency.
 v429: Find And Add Missing Dependencies in the Compatibility Report now also offers to install dependencies right away: the ones just added to the list, and dependencies that were already in the list but not installed. Accepting closes the report and installs them like a normal batch.
 v428: The Compatibility Report now also checks mods in the active list that are not installed yet: for each one with known dependencies it reports whether every dependency is available (installed), in the list but not installed, or missing entirely - previously not-installed mods were skipped completely. Includes the v427 batch-install error logging.

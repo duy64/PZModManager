@@ -1,7 +1,7 @@
 # PZ Mod Manager - Created by duy64. Licensed under the MIT License (see LICENSE.txt).
 #Requires -Version 5.1
 <#
-  PZ Mod Manager v430 - B42 Essentials: mod pack for Single-Player & Multiplayer
+  PZ Mod Manager v431 - B42 Essentials: mod pack for Single-Player & Multiplayer
   Full collection (~190 mods) + Cheat Menu: Rebuild, no Steam client needed.
 #>
 $ErrorActionPreference = 'Stop'
@@ -17,7 +17,7 @@ $NL          = [Environment]::NewLine
 # Target game build. B43 = change these lines; the layout repair and [10] checks derive from them.
 $GameBuild = '42'      # major build: version folder name (42/)
 $GameBuildFull = '42.21'  # current full build: versionMax floor for [10] warnings
-$ScriptVersion = '430'    # app version: shown in the menu header + GUI title
+$ScriptVersion = '431'    # app version: shown in the menu header + GUI title
 
 # All known categories, including ones with zero mods right now (Maps /
 # Audio / Zombies have no catalog mods yet). The category editor lists
@@ -1370,7 +1370,7 @@ function Refresh-ConKeptColumn($modRows, $modsList) {
     $t = $mr.Candidates.Count
     if ($k -eq $t) { $mr.Kept = 'All kept' }
     elseif ($k -eq 0) { $mr.Kept = 'Skipped' }
-    else { $mr.Kept = ($k + ' of ' + $t + ' kept') }
+    else { $mr.Kept = ('{0} of {1} kept' -f $k, $t) }
   }
   $selIdx = $modsList.SelectedIndex
   $modsList.ItemsSource = @($modRows)
@@ -1429,7 +1429,7 @@ function Show-GuiConsolidatedVariantPicker($pendingMods) {
       $k = @($cands | Where-Object { [bool]$_.IsChecked }).Count
       $kept = 'All kept'
       if ($k -eq 0) { $kept = 'Skipped' }
-      elseif ($k -lt $cands.Count) { $kept = ($k + ' of ' + $cands.Count + ' kept') }
+      elseif ($k -lt $cands.Count) { $kept = ('{0} of {1} kept' -f $k, $cands.Count) }
       $modRows += [PSCustomObject]@{ Index = $mi; Name = [string]$pm.Name; WorkshopId = [string]$pm.WorkshopId; Kept = $kept; Candidates = $cands }
     }
     [xml]$xaml = @'
