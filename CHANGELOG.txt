@@ -1,6 +1,7 @@
 PZ MOD MANAGER - FULL CHANGELOG
 Created by duy64. Licensed under the MIT License (see LICENSE.txt).
 
+v441: Standard fix for mods that copied to disk but showed as Not installed (Simple Silencers, Practice Crafting Skills). The install completion now writes the install record immediately after the folders are copied (record first), and every install batch ends with a reconciliation pass that checks each record against the disk and repairs any mismatch, naming the repaired mods in the Done line.
 v440: Removed the Reset All Variant Choices button from the Manage Variants dialog - the reset now lives only in the Tools menu, which is reachable in every state (the dialog does not open when no mod needs a choice). The dialog text points to the Tools menu entry.
 v439: Corrected the v438 removal: Pillow's Random Spawns is back in the full catalog and is NOT blocked anywhere - anyone can add it to any list manually. It is only excluded from the shipped Default list (not seeded into it, and the Default catalog sync does not add it), so new users do not start with it while existing lists keep whatever they already have.
 v438: Removed Pillow's Random Spawns (1911132112) from the catalog at the user's request - it no longer appears in any list, including on existing installs and fresh downloads (catalog entry removed and the Workshop ID retired).

@@ -1,7 +1,7 @@
 # PZ Mod Manager - Created by duy64. Licensed under the MIT License (see LICENSE.txt).
 #Requires -Version 5.1
 <#
-  PZ Mod Manager v440 - B42 Essentials: mod pack for Single-Player & Multiplayer
+  PZ Mod Manager v441 - B42 Essentials: mod pack for Single-Player & Multiplayer
   Full collection (~190 mods) + Cheat Menu: Rebuild, no Steam client needed.
 #>
 $ErrorActionPreference = 'Stop'
@@ -17,7 +17,7 @@ $NL          = [Environment]::NewLine
 # Target game build. B43 = change these lines; the layout repair and [10] checks derive from them.
 $GameBuild = '42'      # major build: version folder name (42/)
 $GameBuildFull = '42.21'  # current full build: versionMax floor for [10] warnings
-$ScriptVersion = '440'    # app version: shown in the menu header + GUI title
+$ScriptVersion = '441'    # app version: shown in the menu header + GUI title
 
 # All known categories, including ones with zero mods right now (Maps /
 # Audio / Zombies have no catalog mods yet). The category editor lists
@@ -1955,6 +1955,24 @@ function Complete-InstallModCore([string]$WorkshopId, [string]$Name, $keptDirs, 
     Write-Host ("  -> id=" + $mid2 + " name=" + $mname) -ForegroundColor Green
     if ($mid2 -ne '' -and $script:DiskModIdMap) { $script:DiskModIdMap[$mid2] = $dn }
   }
+  # Record FIRST: the folders are on disk, so the install record is
+  # written now - before the rescue, dependency installs, and repair
+  # steps below. Writing it only at the end (the pre-v441 layout)
+  # let those steps leave the chain early (recursive rescue retry,
+  # pre-check parking, an error) with the folders copied but no
+  # record saved, so the mod showed as Not installed forever.
+  $stamp = Get-ContentStamp $src
+  $map = Get-InstallMap
+  if (-not $map) { $map = New-Object PSObject }
+  $entry = New-Object PSObject
+  $entry | Add-Member -NotePropertyName 'installed' -NotePropertyValue $true
+  $entry | Add-Member -NotePropertyName 'folders' -NotePropertyValue @($finalNames)
+  $entry | Add-Member -NotePropertyName 'stamp' -NotePropertyValue $stamp
+  $entry | Add-Member -NotePropertyName 'installed_on' -NotePropertyValue (Get-Date -Format 'yyyy-MM-dd')
+  $entry | Add-Member -NotePropertyName 'size' -NotePropertyValue (Get-ModDiskSize @($finalNames))
+  if ($carryVariants) { $entry | Add-Member -NotePropertyName 'variants' -NotePropertyValue @($carryVariants) }
+  $map | Add-Member -NotePropertyName $WorkshopId -NotePropertyValue $entry -Force
+  Save-InstallMap $map
   # Rescue empty installs: the download's real content may sit in a sibling folder
   # the mod.info scan never copies (single-mod items), or the cache may be truncated.
   if (-not $script:EmptyRetry) { $script:EmptyRetry = @{} }
@@ -2021,18 +2039,6 @@ function Complete-InstallModCore([string]$WorkshopId, [string]$Name, $keptDirs, 
       }
     }
   }
-  $stamp = Get-ContentStamp $src
-  $map = Get-InstallMap
-  if (-not $map) { $map = New-Object PSObject }
-  $entry = New-Object PSObject
-  $entry | Add-Member -NotePropertyName 'installed' -NotePropertyValue $true
-  $entry | Add-Member -NotePropertyName 'folders' -NotePropertyValue @($finalNames)
-  $entry | Add-Member -NotePropertyName 'stamp' -NotePropertyValue $stamp
-  $entry | Add-Member -NotePropertyName 'installed_on' -NotePropertyValue (Get-Date -Format 'yyyy-MM-dd')
-  $entry | Add-Member -NotePropertyName 'size' -NotePropertyValue (Get-ModDiskSize @($finalNames))
-  if ($carryVariants) { $entry | Add-Member -NotePropertyName 'variants' -NotePropertyValue @($carryVariants) }
-  $map | Add-Member -NotePropertyName $WorkshopId -NotePropertyValue $entry -Force
-  Save-InstallMap $map
   if (Test-NeedsZombieBuddyAgent $WorkshopId) {
     # ZombieBuddy (or a mod depending on it, e.g. Viewpoint): copy the native agent files to the game folder (asks for game folder once, then saves it)
     Install-ZombieBuddyAgent -AllowPrompt:$true
@@ -2471,6 +2477,76 @@ function Expand-PackIds($pack, $catalog) {
   return @($out | Select-Object -Unique)
 }
 
+
+function Repair-InstallRecords {
+  # Standard reconciliation: the install record must match the disk.
+  # Every map entry not marked installed, plus every mod attempted in
+  # this batch that has no entry at all, is checked against the
+  # folders actually present in the mods directory; when at least one
+  # folder with a root mod.info is present, the entry is created or
+  # healed (installed, the present folders, their Mod IDs as the
+  # variants). Returns the names of the repaired mods. Runs at the
+  # end of every install batch, so a completion that lost its record
+  # write self-corrects instead of leaving the mod shown as
+  # Not installed (the Simple Silencers / Practice Crafting Skills
+  # bug).
+  $repaired = @()
+  $map = Get-InstallMap
+  if (-not $map) { $map = New-Object PSObject }
+  $dirty = $false
+  $nameOf = @{}
+  foreach ($m in @($script:Mods)) { $nameOf[[string]$m.WorkshopId] = [string]$m.Name }
+  $check = @{}
+  foreach ($prop in @($map.PSObject.Properties)) { if ([string]$prop.Name -match '^\d+$') { $check[[string]$prop.Name] = $prop } }
+  foreach ($pd in @($script:PendingVariantDecisions)) { if (-not $check.ContainsKey([string]$pd.WorkshopId)) { $check[[string]$pd.WorkshopId] = $null } }
+  foreach ($wid in @($check.Keys)) {
+    $prop = $check[$wid]
+    if ($prop -and $prop.Value.PSObject.Properties['installed'] -and $prop.Value.installed -eq $true) { continue }
+    $candNames = @()
+    if ($prop -and $prop.Value.PSObject.Properties['folders']) { $candNames += @($prop.Value.folders | ForEach-Object { [string]$_ }) }
+    $pd = @($script:PendingVariantDecisions | Where-Object { [string]$_.WorkshopId -eq $wid })[0]
+    if ($pd) {
+      foreach ($vd in @($pd.VariantDirs)) {
+        $dn = [string]$vd.Name
+        if ($dn -match '^(?i)(\d{10}([_.].*)?|\d+(\.\d+)*(_\d+(\.\d+)*)?|common|mods?|main|default)$') {
+          $mid = Get-ModInfoId (Join-Path $vd.FullName 'mod.info')
+          if ($mid -match '^[A-Za-z0-9_.\-]+$') { $dn = $mid }
+        }
+        if ($candNames -notcontains $dn) { $candNames += $dn }
+      }
+    }
+    $present = @()
+    foreach ($cn in $candNames) { if (Test-Path (Join-Path (Join-Path $ModsDir $cn) 'mod.info')) { $present += $cn } }
+    if ($present.Count -eq 0) { continue }
+    $varIds = @()
+    foreach ($pf in $present) { $vm = Get-ModInfoId (Join-Path (Join-Path $ModsDir $pf) 'mod.info'); if ($vm -ne '') { $varIds += $vm } }
+    if ($prop) {
+      $e = $prop.Value
+      if ($e.PSObject.Properties['installed']) { $e.installed = $true } else { $e | Add-Member -NotePropertyName 'installed' -NotePropertyValue $true }
+      if ($e.PSObject.Properties['folders']) { $e.folders = @($present) } else { $e | Add-Member -NotePropertyName 'folders' -NotePropertyValue @($present) }
+      if (-not $e.PSObject.Properties['installed_on'] -or [string]$e.installed_on -eq '') {
+        if ($e.PSObject.Properties['installed_on']) { $e.installed_on = (Get-Date -Format 'yyyy-MM-dd') } else { $e | Add-Member -NotePropertyName 'installed_on' -NotePropertyValue (Get-Date -Format 'yyyy-MM-dd') }
+      }
+      if ($varIds.Count -gt 0) { if ($e.PSObject.Properties['variants']) { $e.variants = @($varIds) } else { $e | Add-Member -NotePropertyName 'variants' -NotePropertyValue @($varIds) } }
+      if ($e.PSObject.Properties['size']) { $e.size = (Get-ModDiskSize @($present)) } else { $e | Add-Member -NotePropertyName 'size' -NotePropertyValue (Get-ModDiskSize @($present)) }
+    } else {
+      $e = New-Object PSObject
+      $e | Add-Member -NotePropertyName 'installed' -NotePropertyValue $true
+      $e | Add-Member -NotePropertyName 'folders' -NotePropertyValue @($present)
+      $e | Add-Member -NotePropertyName 'stamp' -NotePropertyValue (Get-ContentStamp (Join-Path $ModsDir $present[0]))
+      $e | Add-Member -NotePropertyName 'installed_on' -NotePropertyValue (Get-Date -Format 'yyyy-MM-dd')
+      $e | Add-Member -NotePropertyName 'size' -NotePropertyValue (Get-ModDiskSize @($present))
+      if ($varIds.Count -gt 0) { $e | Add-Member -NotePropertyName 'variants' -NotePropertyValue @($varIds) }
+      $map | Add-Member -NotePropertyName $wid -NotePropertyValue $e -Force
+    }
+    $dirty = $true
+    $nm = $wid
+    if ($nameOf.ContainsKey($wid)) { $nm = $nameOf[$wid] } elseif ($pd) { $nm = [string]$pd.Name }
+    $repaired += $nm
+  }
+  if ($dirty) { Save-InstallMap $map }
+  return $repaired
+}
 
 function Get-InstalledWorkshopIds {
   # Installed = at least one recorded folder really exists on disk with mod.info.
@@ -5699,7 +5775,10 @@ function Install-GuiSelectedMods {
       }
     }
   }
-  if ($script:AbortVariantBatch) { Set-GuiTransientStatus ('Installation cancelled.') } else { Set-GuiTransientStatus ('Done: ' + $ok + '/' + $ids.Count + ' selected mods installed.') }
+  $repairedNames = Repair-InstallRecords
+  $doneText = 'Done: ' + $ok + '/' + $ids.Count + ' selected mods installed.'
+  if (@($repairedNames).Count -gt 0) { $doneText += ' Install records repaired for: ' + (@($repairedNames) -join ', ') + '.' }
+  if ($script:AbortVariantBatch) { Set-GuiTransientStatus ('Installation cancelled.') } else { Set-GuiTransientStatus $doneText }
   Clear-GuiSelection
   # Standard: refresh every view after install (one composite call).
   Refresh-GuiAfterListChange
