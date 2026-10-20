@@ -1,7 +1,7 @@
 # PZ Mod Manager - Created by duy64. Licensed under the MIT License (see LICENSE.txt).
 #Requires -Version 5.1
 <#
-  PZ Mod Manager v439 - B42 Essentials: mod pack for Single-Player & Multiplayer
+  PZ Mod Manager v440 - B42 Essentials: mod pack for Single-Player & Multiplayer
   Full collection (~190 mods) + Cheat Menu: Rebuild, no Steam client needed.
 #>
 $ErrorActionPreference = 'Stop'
@@ -17,7 +17,7 @@ $NL          = [Environment]::NewLine
 # Target game build. B43 = change these lines; the layout repair and [10] checks derive from them.
 $GameBuild = '42'      # major build: version folder name (42/)
 $GameBuildFull = '42.21'  # current full build: versionMax floor for [10] warnings
-$ScriptVersion = '439'    # app version: shown in the menu header + GUI title
+$ScriptVersion = '440'    # app version: shown in the menu header + GUI title
 
 # All known categories, including ones with zero mods right now (Maps /
 # Audio / Zombies have no catalog mods yet). The category editor lists
@@ -5797,9 +5797,9 @@ function Reset-AllVariantChoices {
   # Clear every stored variant choice (installed folders are not
   # touched). Choices will be asked again on the next install,
   # update, or Manage Variants. Reachable from the Manage Variants
-  # dialog button AND from the Tools menu - the menu entry matters
-  # because the dialog does not open when no mod needs a choice,
-  # which is exactly when a reset is wanted.
+  # Tools menu entry: the Manage Variants dialog does not open when
+  # no mod needs a choice - exactly when a reset is wanted - so the
+  # reset lives in the menu, reachable in every state.
   $yn = Show-GuiMessageBox 'Reset all variant choices? Every stored version choice will be cleared. Installed folders are not touched, and choices will be asked again on the next install, update, or Manage Variants.' 'Reset All Variant Choices' ([System.Windows.MessageBoxButton]::YesNo) ([System.Windows.MessageBoxImage]::Question)
   if ($yn -ne [System.Windows.MessageBoxResult]::Yes) { Set-GuiTransientStatus ('Reset cancelled.'); return }
   $mapR = Get-InstallMap
@@ -5873,12 +5873,11 @@ function Manage-GuiModVariants {
     if ($anyChoice) { Set-GuiTransientStatus ('No mods need a version choice. To choose again, use Tools > Reset All Variant Choices.'); return }
     Set-GuiTransientStatus ('No installed mods have multiple variants to manage.'); return
   }
-  $pick = Show-GuiWpfPicker 'Manage Variants' 'Select the mod(s) to choose versions for. A mod leaves this list once its choice is saved; Reset All Variant Choices makes every mod ask again.' $candidates @(
+  $pick = Show-GuiWpfPicker 'Manage Variants' 'Select the mod(s) to choose versions for. A mod leaves this list once its choice is saved; Tools > Reset All Variant Choices makes every mod ask again.' $candidates @(
     @{ Header = 'Name'; Property = 'Name'; Width = 500 },
     @{ Header = 'Variants'; Property = 'VariantCount'; Width = 100 },
     @{ Header = 'Workshop ID'; Property = 'WorkshopId'; Width = 150 }
-  ) 'Manage Selected' -ExtraButtonText 'Reset All Variant Choices'
-  if ($pick.ExtraClicked) { Reset-AllVariantChoices; return }
+  ) 'Manage Selected'
   if ($pick.Failed -or $pick.CancelAll) { return }
   $ids = @($pick.Selected | ForEach-Object { [string]$_.WorkshopId })
   if ($ids.Count -eq 0) { return }
