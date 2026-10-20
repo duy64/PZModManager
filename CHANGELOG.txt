@@ -1,6 +1,7 @@
 PZ MOD MANAGER - FULL CHANGELOG
 Created by duy64. Licensed under the MIT License (see LICENSE.txt).
 
+v429: Find And Add Missing Dependencies in the Compatibility Report now also offers to install dependencies right away: the ones just added to the list, and dependencies that were already in the list but not installed. Accepting closes the report and installs them like a normal batch.
 v428: The Compatibility Report now also checks mods in the active list that are not installed yet: for each one with known dependencies it reports whether every dependency is available (installed), in the list but not installed, or missing entirely - previously not-installed mods were skipped completely. Includes the v427 batch-install error logging.
 v427: Batch installs can no longer crash the app: an error during Install Selected now stops the batch, keeps the app running, and logs the full error record (exact failing line and stack) to gui-error.txt. Includes the v426 same-download dependency fix.
 v426: Fixed a false 'Missing dependency' in the pre-install check: when one Workshop item bundles several mods (Immersive Camos ships the AccCamos base mod plus AccCamosPeriodPack, which requires it), requirements satisfied by another mod in the same download are no longer reported as missing.

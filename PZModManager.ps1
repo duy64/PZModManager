@@ -1,7 +1,7 @@
 # PZ Mod Manager - Created by duy64. Licensed under the MIT License (see LICENSE.txt).
 #Requires -Version 5.1
 <#
-  PZ Mod Manager v428 - B42 Essentials: mod pack for Single-Player & Multiplayer
+  PZ Mod Manager v429 - B42 Essentials: mod pack for Single-Player & Multiplayer
   Full collection (~190 mods) + Cheat Menu: Rebuild, no Steam client needed.
 #>
 $ErrorActionPreference = 'Stop'
@@ -17,7 +17,7 @@ $NL          = [Environment]::NewLine
 # Target game build. B43 = change these lines; the layout repair and [10] checks derive from them.
 $GameBuild = '42'      # major build: version folder name (42/)
 $GameBuildFull = '42.21'  # current full build: versionMax floor for [10] warnings
-$ScriptVersion = '428'    # app version: shown in the menu header + GUI title
+$ScriptVersion = '429'    # app version: shown in the menu header + GUI title
 
 # All known categories, including ones with zero mods right now (Maps /
 # Audio / Zombies have no catalog mods yet). The category editor lists
@@ -5165,6 +5165,45 @@ function Show-GuiCompatibilityReport($rows) {
       if ($stale.Count -gt 0) { $msg += ('Stale dep(s) with no Workshop match (Mod ID may be renamed/dead - remove the patch mod instead of installing more): ' + ($stale -join ', ') + '. ') }
       if ($searchErrors.Count -gt 0) { $msg += ('Search failed for: ' + ($searchErrors -join '; ') + '. ') }
       if ($msg -eq '') { $msg = 'No dependencies to add (none found).' }
+      # Offer to install what can be installed right away: the
+      # dependencies just added, plus dependencies that were already
+      # in the list but are not installed. Installing needs the main
+      # window (Install-Mod can open pickers), so the report closes
+      # first, then the installs run like a normal batch.
+      $installCands = @{}
+      $candWids = @()
+      foreach ($a in $added) { $candWids += [string]$a.WorkshopId }
+      foreach ($d in $depIds) { if ($ModIdToWorkshop.ContainsKey($d)) { $candWids += [string]$ModIdToWorkshop[$d] } }
+      $installedWids = @(Get-InstalledWorkshopIds)
+      foreach ($cw in $candWids) {
+        if ($installCands.ContainsKey($cw)) { continue }
+        if ($installedWids -contains $cw) { continue }
+        $cName = $cw
+        $lm = @($Mods | Where-Object { [string]$_.WorkshopId -eq $cw })[0]
+        if ($lm) { $cName = [string]$lm.Name }
+        else { $am = @($added | Where-Object { [string]$_.WorkshopId -eq $cw })[0]; if ($am) { $cName = [string]$am.Name } }
+        $installCands[$cw] = $cName
+      }
+      if ($installCands.Count -gt 0) {
+        $ask = Show-GuiMessageBox (('Install ' + $installCands.Count + ' dependencies now?') + "`n" + ((@($installCands.Values)) -join "`n")) 'PZ Mod Manager' ([System.Windows.MessageBoxButton]::YesNo) ([System.Windows.MessageBoxImage]::Question)
+        if ($ask -eq [System.Windows.MessageBoxResult]::Yes) {
+          $window.Close()
+          Set-GuiBusy $true
+          $instOk = 0
+          try {
+            $iStart = Get-Date
+            $iN = 0
+            foreach ($cw in @($installCands.Keys)) {
+              $iN++
+              Show-GuiInstallProgress $iN $installCands.Count $installCands[$cw] $iStart 'Installing'
+              if ((Install-Mod $cw $installCands[$cw]) -eq $true) { $instOk++ }
+            }
+          } finally { Set-GuiBusy $false }
+          Refresh-GuiAfterListChange
+          Set-GuiTransientStatus ($msg + ('Installed ' + $instOk + '/' + $installCands.Count + ' dependencies.'))
+          return
+        }
+      }
       Set-GuiTransientStatus $msg
       $window.Close()
     })
