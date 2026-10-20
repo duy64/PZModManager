@@ -1,7 +1,7 @@
 # PZ Mod Manager - Created by duy64. Licensed under the MIT License (see LICENSE.txt).
 #Requires -Version 5.1
 <#
-  PZ Mod Manager v427 - B42 Essentials: mod pack for Single-Player & Multiplayer
+  PZ Mod Manager v428 - B42 Essentials: mod pack for Single-Player & Multiplayer
   Full collection (~190 mods) + Cheat Menu: Rebuild, no Steam client needed.
 #>
 $ErrorActionPreference = 'Stop'
@@ -17,7 +17,7 @@ $NL          = [Environment]::NewLine
 # Target game build. B43 = change these lines; the layout repair and [10] checks derive from them.
 $GameBuild = '42'      # major build: version folder name (42/)
 $GameBuildFull = '42.21'  # current full build: versionMax floor for [10] warnings
-$ScriptVersion = '427'    # app version: shown in the menu header + GUI title
+$ScriptVersion = '428'    # app version: shown in the menu header + GUI title
 
 # All known categories, including ones with zero mods right now (Maps /
 # Audio / Zombies have no catalog mods yet). The category editor lists
@@ -4880,7 +4880,41 @@ function Get-CompatibilityReport {
     if ($myInfos.Count -eq 0 -and $widToModId.ContainsKey($wid) -and $modIdToInfos.ContainsKey($widToModId[$wid])) {
       $myInfos = $modIdToInfos[$widToModId[$wid]]
     }
-    if ($myInfos.Count -eq 0) { continue }
+    if ($myInfos.Count -eq 0) {
+      # Not installed: its own files cannot be checked, but its KNOWN
+      # dependencies (the curated $DepMap) can - report whether each
+      # dependency is available: installed, in the list, or missing
+      # entirely. Mods with no known dependencies stay out of the
+      # report (nothing to check until they are installed).
+      $depWids = @()
+      if ($DepMap.ContainsKey($wid)) { $depWids = @($DepMap[$wid]) }
+      if ($depWids.Count -eq 0) { continue }
+      $nBlocked = @(); $nNotes = @(); $nMissing = @()
+      foreach ($dw in $depWids) {
+        $dName = ('Workshop ' + $dw)
+        $dm = @($Mods | Where-Object { [string]$_.WorkshopId -eq $dw })[0]
+        if ($dm) { $dName = ([string]$dm.Name + ' (Workshop ' + $dw + ')') }
+        elseif ($widToModId.ContainsKey($dw)) { $dName = ([string]$widToModId[$dw] + ' (Workshop ' + $dw + ')') }
+        if ($widToFolders.ContainsKey($dw)) {
+          $nNotes += ('Dependency available (installed): ' + $dName)
+        } elseif ($listWids -contains $dw) {
+          $nBlocked += ('Dependency not installed: ' + $dName + ' - it is in the list, install it with this mod')
+          if ($widToModId.ContainsKey($dw) -and $nMissing -notcontains $widToModId[$dw]) { $nMissing += $widToModId[$dw] }
+        } else {
+          $nBlocked += ('Dependency missing entirely: ' + $dName + ' - it is not in the list')
+          if ($widToModId.ContainsKey($dw) -and $nMissing -notcontains $widToModId[$dw]) { $nMissing += $widToModId[$dw] }
+        }
+      }
+      $nVerdict = 'Compatible'
+      $nDetails = 'OK'
+      if ($nBlocked.Count -gt 0) {
+        $nVerdict = 'Incompatible'
+        $nDetails = ($nBlocked -join '; ')
+        if ($nNotes.Count -gt 0) { $nDetails += ' | ' + ($nNotes -join '; ') }
+      } elseif ($nNotes.Count -gt 0) { $nDetails = ($nNotes -join '; ') }
+      $rows += [PSCustomObject]@{ Name = $name; WorkshopId = $wid; Verdict = $nVerdict; Details = ('Not installed - dependency check only. ' + $nDetails); MissingDeps = $nMissing }
+      continue
+    }
     $blocked = @(); $notes = @(); $missingDeps = @()
     $multi = ($myInfos.Count -gt 1)
     foreach ($miPath in $myInfos) {
@@ -4960,14 +4994,14 @@ function Show-GuiCompatibilityReport($rows) {
   # Read-only compatibility report dialog: Name | Workshop ID | Verdict |
   # Details. No checkboxes (report, not a picker). Search + header-click
   # sort (2-state toggle, like the tabs). Incompatible rows first, then Name.
-  if (@($rows).Count -eq 0) { Set-GuiTransientStatus 'Compatibility report: no installed mods in the active list.'; return }
+  if (@($rows).Count -eq 0) { Set-GuiTransientStatus 'Compatibility report: nothing to check in the active list.'; return }
   try {
     Add-Type -AssemblyName PresentationFramework -ErrorAction Stop
     Add-Type -AssemblyName PresentationCore -ErrorAction Stop
     Add-Type -AssemblyName WindowsBase -ErrorAction Stop
     $wont = @($rows | Where-Object { $_.Verdict -eq "Incompatible" }).Count
     $should = $rows.Count - $wont
-    $summary = ($should.ToString() + ' compatible, ' + $wont.ToString() + ' incompatible (of ' + $rows.Count.ToString() + ' installed mods in the active list)')
+    $summary = ($should.ToString() + ' compatible, ' + $wont.ToString() + ' incompatible (of ' + $rows.Count.ToString() + ' mods checked in the active list)')
     $sorted = @($rows | Sort-Object @{ Expression = { if ($_.Verdict -eq "Incompatible") { 0 } else { 1 } } }, Name)
     [xml]$xaml = @'
 <Window xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
@@ -5179,7 +5213,7 @@ function Show-GuiCompatibilityReportDialog {
   Set-GuiBusy $true
   try {
     $rows = @(Get-CompatibilityReport)
-    if ($rows.Count -eq 0) { Set-GuiTransientStatus 'Compatibility report: no installed mods in the active list.'; return }
+    if ($rows.Count -eq 0) { Set-GuiTransientStatus 'Compatibility report: nothing to check in the active list.'; return }
     Show-GuiCompatibilityReport $rows
     $wont = @($rows | Where-Object { $_.Verdict -eq "Incompatible" }).Count
     Set-GuiTransientStatus ('Compatibility report: ' + ($rows.Count - $wont).ToString() + ' compatible, ' + $wont.ToString() + ' incompatible.')
