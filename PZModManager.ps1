@@ -1,7 +1,7 @@
 # PZ Mod Manager - Created by duy64. Licensed under the MIT License (see LICENSE.txt).
 #Requires -Version 5.1
 <#
-  PZ Mod Manager v425 - B42 Essentials: mod pack for Single-Player & Multiplayer
+  PZ Mod Manager v426 - B42 Essentials: mod pack for Single-Player & Multiplayer
   Full collection (~190 mods) + Cheat Menu: Rebuild, no Steam client needed.
 #>
 $ErrorActionPreference = 'Stop'
@@ -17,7 +17,7 @@ $NL          = [Environment]::NewLine
 # Target game build. B43 = change these lines; the layout repair and [10] checks derive from them.
 $GameBuild = '42'      # major build: version folder name (42/)
 $GameBuildFull = '42.21'  # current full build: versionMax floor for [10] warnings
-$ScriptVersion = '425'    # app version: shown in the menu header + GUI title
+$ScriptVersion = '426'    # app version: shown in the menu header + GUI title
 
 # All known categories, including ones with zero mods right now (Maps /
 # Audio / Zombies have no catalog mods yet). The category editor lists
@@ -1781,6 +1781,16 @@ function Test-PreInstallCompatible([string]$WorkshopId, [string]$Name, $keptDirs
   $blocked = @()
   $willInstallDeps = @()
   $multi = (@($keptDirs).Count -gt 1)
+  # Mod IDs provided by THIS install itself: a multi-mod item often
+  # bundles a base mod plus add-ons that require it (Immersive Camos
+  # ships AccCamos + AccCamosPeriodPack, which requires AccCamos).
+  # Those requirements are satisfied by the same download and must
+  # not be reported as missing dependencies.
+  $ownIds = @{}
+  foreach ($dir in @($keptDirs)) {
+    $oid = Get-ModInfoId (Join-Path $dir.FullName 'mod.info')
+    if ($oid) { $ownIds[$oid] = $true }
+  }
   foreach ($dir in @($keptDirs)) {
     $miPath = Join-Path $dir.FullName 'mod.info'
     $fid = Get-ModInfoId $miPath
@@ -1829,6 +1839,7 @@ function Test-PreInstallCompatible([string]$WorkshopId, [string]$Name, $keptDirs
       $reqIds = @($reqM.Groups[1].Value -split '[,;]' | ForEach-Object { $_.Trim().TrimStart('\') } | Where-Object { $_ -ne '' })
       $diskMap = Get-DiskModIdMap
       foreach ($rid in $reqIds) {
+        if ($ownIds.ContainsKey($rid)) { continue }
         if ($diskMap.ContainsKey($rid)) { continue }
         if ($ModIdToWorkshop.ContainsKey($rid)) { if ($willInstallDeps -notcontains $rid) { $willInstallDeps += $rid }; continue }
         $blocked += ($prefix + "Missing dependency '$rid' (unknown Workshop ID - cannot resolve it)")

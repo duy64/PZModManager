@@ -1,6 +1,7 @@
 PZ MOD MANAGER - FULL CHANGELOG
 Created by duy64. Licensed under the MIT License (see LICENSE.txt).
 
+v426: Fixed a false 'Missing dependency' in the pre-install check: when one Workshop item bundles several mods (Immersive Camos ships the AccCamos base mod plus AccCamosPeriodPack, which requires it), requirements satisfied by another mod in the same download are no longer reported as missing.
 v425: Fixed the search crash (app closed with 'You cannot call a method on a null-valued expression' when typing in a search box): the debounce timer's tick handler did not capture its timer variable, so it fired with a null timer. The handler now uses a closure. Reproduced and verified outside the GUI before shipping.
 v424: Search boxes can no longer crash the app: the debounced search actions now catch errors, log the full record (including the exact failing line) to gui-error.txt, and keep the app running. Includes the v423 copyable detail panes.
 v423: Detail panes in the picker, the consolidated version picker, and the Compatibility Report are now read-only text boxes, so the text (reasons, missing dependency names, Workshop IDs) can be selected and copied for lookup.
