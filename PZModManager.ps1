@@ -1,7 +1,7 @@
 # PZ Mod Manager - Created by duy64. Licensed under the MIT License (see LICENSE.txt).
 #Requires -Version 5.1
 <#
-  PZ Mod Manager v408 - B42 Essentials: mod pack for Single-Player & Multiplayer
+  PZ Mod Manager v409 - B42 Essentials: mod pack for Single-Player & Multiplayer
   Full collection (~190 mods) + Cheat Menu: Rebuild, no Steam client needed.
 #>
 $ErrorActionPreference = 'Stop'
@@ -17,7 +17,7 @@ $NL          = [Environment]::NewLine
 # Target game build. B43 = change these lines; the layout repair and [10] checks derive from them.
 $GameBuild = '42'      # major build: version folder name (42/)
 $GameBuildFull = '42.21'  # current full build: versionMax floor for [10] warnings
-$ScriptVersion = '408'    # app version: shown in the menu header + GUI title
+$ScriptVersion = '409'    # app version: shown in the menu header + GUI title
 
 # All known categories, including ones with zero mods right now (Maps /
 # Audio / Zombies have no catalog mods yet). The category editor lists
@@ -734,12 +734,31 @@ function Start-WorkshopRatingsFetch($ids) {
         $ratings[[string]$wid] = $stars
         Start-Sleep -Milliseconds 300
       }
+      $dbg = @()
+      $dbg += ((Get-Date -Format 'yyyy-MM-dd HH:mm:ss') + ' scraped ' + $ratings.Count + ' ids')
       try {
-        Add-Type -AssemblyName System.Web.Extensions -ErrorAction SilentlyContinue
-        $ser = New-Object System.Web.Script.Serialization.JavaScriptSerializer
-        $json = $ser.Serialize(@{ fetched = (Get-Date -Format 'yyyy-MM-dd'); ratings = $ratings })
-        [System.IO.File]::WriteAllText($cacheFile, $json, [System.Text.Encoding]::UTF8)
-      } catch { }
+        # Manual JSON (no assemblies - JavaScriptSerializer is .NET
+        # Framework only and ConvertTo-Json is unreliable for this).
+        $jb = New-Object System.Text.StringBuilder
+        [void]$jb.Append('{"fetched":"')
+        [void]$jb.Append((Get-Date -Format 'yyyy-MM-dd'))
+        [void]$jb.Append('","ratings":{')
+        $first = $true
+        foreach ($rk in @($ratings.Keys | Sort-Object)) {
+          if (-not $first) { [void]$jb.Append(',') }
+          $first = $false
+          [void]$jb.Append('"')
+          [void]$jb.Append([string]$rk)
+          [void]$jb.Append('":')
+          [void]$jb.Append([string]([int]$ratings[$rk]))
+        }
+        [void]$jb.Append('}}')
+        [System.IO.File]::WriteAllText($cacheFile, $jb.ToString(), [System.Text.Encoding]::UTF8)
+        $dbg += 'wrote ' + $cacheFile
+      } catch {
+        $dbg += ('WRITE FAILED: ' + $_.Exception.Message)
+      }
+      try { [System.IO.File]::WriteAllLines([System.IO.Path]::ChangeExtension($cacheFile, '.debug.txt'), $dbg, [System.Text.Encoding]::UTF8) } catch { }
     }
     [void]$ps.AddScript($scriptBlock).AddParameters(@{ needIds = $need; cacheFile = $WorkshopRatingsFile; existingRatings = $existing })
     $handle = $ps.BeginInvoke()
@@ -7087,6 +7106,31 @@ function Show-Gui {
     # Star ratings: scrape missing/stale entries in the background
     # (Steam API does not expose them). Next refresh picks them up.
     Start-WorkshopRatingsFetch @($Mods | ForEach-Object { [string]$_.WorkshopId })
+    # Auto-refresh when the background ratings job finishes (the UI does
+    # not pick up the file on its own - without this the stars never
+    # appear unless the user triggers a refresh manually).
+    if ($script:RatingsFetchJob) {
+      Set-GuiTransientStatus 'Fetching star ratings in the background...' 8
+      $rtTimer = New-Object System.Windows.Threading.DispatcherTimer
+      $rtTimer.Interval = [TimeSpan]::FromSeconds(20)
+      $rtTimer.Add_Tick({
+        try {
+          $job = $script:RatingsFetchJob
+          if (-not $job) { $script:RatingsTimer.Stop(); return }
+          if ($job.Handle.AsyncWaitHandle.WaitOne(0)) {
+            $script:RatingsTimer.Stop()
+            try { [void]$job.PS.EndInvoke($job.Handle) } catch { }
+            try { $job.PS.Dispose() } catch { }
+            try { $job.Runspace.Close() } catch { }
+            $script:RatingsFetchJob = $null
+            Refresh-GuiMods
+            Set-GuiTransientStatus 'Star ratings updated.' 5
+          }
+        } catch { try { $script:RatingsTimer.Stop() } catch { } }
+      })
+      $script:RatingsTimer = $rtTimer
+      $rtTimer.Start()
+    }
     Set-GuiWindowIcon
     if ($script:StartupAdoptSummary) { Set-GuiTransientStatus $script:StartupAdoptSummary 15 }
     [void]$script:GuiWindow.ShowDialog()
