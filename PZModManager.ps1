@@ -1,7 +1,7 @@
 # PZ Mod Manager - Created by duy64. Licensed under the MIT License (see LICENSE.txt).
 #Requires -Version 5.1
 <#
-  PZ Mod Manager v395 - B42 Essentials: mod pack for Single-Player & Multiplayer
+  PZ Mod Manager v396 - B42 Essentials: mod pack for Single-Player & Multiplayer
   Full collection (~190 mods) + Cheat Menu: Rebuild, no Steam client needed.
 #>
 $ErrorActionPreference = 'Stop'
@@ -17,7 +17,7 @@ $NL          = [Environment]::NewLine
 # Target game build. B43 = change these lines; the layout repair and [10] checks derive from them.
 $GameBuild = '42'      # major build: version folder name (42/)
 $GameBuildFull = '42.21'  # current full build: versionMax floor for [10] warnings
-$ScriptVersion = '395'    # app version: shown in the menu header + GUI title
+$ScriptVersion = '396'    # app version: shown in the menu header + GUI title
 
 # All known categories, including ones with zero mods right now (Maps /
 # Audio / Zombies have no catalog mods yet). The category editor lists
@@ -5272,21 +5272,35 @@ function Remove-GuiSelectedModsFromList {
   Refresh-GuiAfterListChange
 }
 
-function Sync-GuiHeaderCheckbox($listView, $tag, $shownIds, $selected) {
-  # Standard: the header Select-All checkbox must always reflect reality.
-  # Checked only when at least one row is shown AND every shown row is selected.
-  if (-not $listView) { return }
+function Find-GuiHeaderCheckbox($listView, $tag) {
+  # One-time visual tree walk to locate a header checkbox. Result is cached
+  # in $script:GuiHeaderCheckboxes; Sync uses the cache (no walk per click).
+  if (-not $listView) { return $null }
   try {
     $queue = New-Object System.Collections.Generic.Queue[System.Windows.DependencyObject]
     $queue.Enqueue($listView)
-    $cb = $null
-    while ($queue.Count -gt 0 -and -not $cb) {
+    while ($queue.Count -gt 0) {
       $obj = $queue.Dequeue()
-      if ($obj -is [System.Windows.Controls.CheckBox] -and [string]$obj.Tag -eq $tag) { $cb = $obj; break }
+      if ($obj -is [System.Windows.Controls.CheckBox] -and [string]$obj.Tag -eq $tag) { return $obj }
       if ($obj -is [System.Windows.Media.Visual]) {
         $n = [System.Windows.Media.VisualTreeHelper]::GetChildrenCount($obj)
         for ($i = 0; $i -lt $n; $i++) { $queue.Enqueue([System.Windows.Media.VisualTreeHelper]::GetChild($obj, $i)) }
       }
+    }
+  } catch { }
+  return $null
+}
+function Sync-GuiHeaderCheckbox($listView, $tag, $shownIds, $selected) {
+  # Standard: the header Select-All checkbox must always reflect reality.
+  # Checked only when at least one row is shown AND every shown row is selected.
+  # Uses a cached checkbox reference (populated once per ListView); the tree
+  # walk only runs on first use, not on every click.
+  try {
+    if (-not $script:GuiHeaderCheckboxes) { $script:GuiHeaderCheckboxes = @{} }
+    $cb = $script:GuiHeaderCheckboxes[$tag]
+    if (-not $cb) {
+      $cb = Find-GuiHeaderCheckbox $listView $tag
+      if ($cb) { $script:GuiHeaderCheckboxes[$tag] = $cb }
     }
     if ($cb) {
       $all = $false
@@ -5297,6 +5311,16 @@ function Sync-GuiHeaderCheckbox($listView, $tag, $shownIds, $selected) {
       $cb.IsChecked = $all
     }
   } catch { }
+}
+
+function New-GuiDebounce($milliseconds, [scriptblock]$action) {
+  # Returns a scriptblock that delays $action until $milliseconds pass with
+  # no new calls. Standard for search-as-you-type: avoids a full refresh
+  # (list rebuild + sort + stats) on every keystroke.
+  $timer = New-Object System.Windows.Threading.DispatcherTimer
+  $timer.Interval = [TimeSpan]::FromMilliseconds($milliseconds)
+  $timer.Add_Tick({ $timer.Stop(); & $action })
+  return { param() $timer.Stop(); $timer.Start() }.GetNewClosure()
 }
 
 function Clear-GuiSelection {
@@ -6645,7 +6669,8 @@ function Show-Gui {
     Refresh-GuiNamedLists
     Refresh-GuiCategoriesTab
 
-    $script:GuiSearchBox.Add_TextChanged({ Clear-GuiSelection; Refresh-GuiMods })
+    $debouncedModsSearch = New-GuiDebounce 300 { Clear-GuiSelection; Refresh-GuiMods }
+    $script:GuiSearchBox.Add_TextChanged({ & $debouncedModsSearch })
     $script:GuiCategoryBox.Add_SelectionChanged({
       $script:GuiCategory = $script:GuiCategoryBox.SelectedItem
       Clear-GuiSelection; Refresh-GuiMods
@@ -6914,9 +6939,12 @@ function Show-Gui {
     $script:GuiNewListButton.Add_Click({ New-GuiNamedList })
     $script:GuiImportListButton.Add_Click({ Import-GuiList })
     $script:GuiExportSelectedListButton.Add_Click({ Export-GuiList })
-    $script:GuiPackSearchBox.Add_TextChanged({ $script:GuiPackSearch = $script:GuiPackSearchBox.Text; Clear-GuiSelection; Refresh-GuiPacks })
-    $script:GuiListSearchBox.Add_TextChanged({ $script:GuiListSearch = $script:GuiListSearchBox.Text; Clear-GuiSelection; Refresh-GuiNamedLists })
-    $script:GuiCategorySearchBox.Add_TextChanged({ $script:GuiCategorySearch = $script:GuiCategorySearchBox.Text; Clear-GuiSelection; Refresh-GuiCategoriesTab })
+    $debouncedPacksSearch = New-GuiDebounce 300 { $script:GuiPackSearch = $script:GuiPackSearchBox.Text; Clear-GuiSelection; Refresh-GuiPacks }
+    $script:GuiPackSearchBox.Add_TextChanged({ & $debouncedPacksSearch })
+    $debouncedListsSearch = New-GuiDebounce 300 { $script:GuiListSearch = $script:GuiListSearchBox.Text; Clear-GuiSelection; Refresh-GuiNamedLists }
+    $script:GuiListSearchBox.Add_TextChanged({ & $debouncedListsSearch })
+    $debouncedCatsSearch = New-GuiDebounce 300 { $script:GuiCategorySearch = $script:GuiCategorySearchBox.Text; Clear-GuiSelection; Refresh-GuiCategoriesTab }
+    $script:GuiCategorySearchBox.Add_TextChanged({ & $debouncedCatsSearch })
     $script:GuiTabControl.Add_SelectionChanged({
       if ($script:GuiSelectionDirty) {
         $script:GuiSelectionDirty = $false
