@@ -1,7 +1,7 @@
 # PZ Mod Manager - Created by duy64. Licensed under the MIT License (see LICENSE.txt).
 #Requires -Version 5.1
 <#
-  PZ Mod Manager v412 - B42 Essentials: mod pack for Single-Player & Multiplayer
+  PZ Mod Manager v413 - B42 Essentials: mod pack for Single-Player & Multiplayer
   Full collection (~190 mods) + Cheat Menu: Rebuild, no Steam client needed.
 #>
 $ErrorActionPreference = 'Stop'
@@ -17,7 +17,7 @@ $NL          = [Environment]::NewLine
 # Target game build. B43 = change these lines; the layout repair and [10] checks derive from them.
 $GameBuild = '42'      # major build: version folder name (42/)
 $GameBuildFull = '42.21'  # current full build: versionMax floor for [10] warnings
-$ScriptVersion = '412'    # app version: shown in the menu header + GUI title
+$ScriptVersion = '413'    # app version: shown in the menu header + GUI title
 
 # All known categories, including ones with zero mods right now (Maps /
 # Audio / Zombies have no catalog mods yet). The category editor lists
@@ -3939,6 +3939,7 @@ function Sort-GuiPackMemberRows($rows) {
   if ($col -eq 'Status') { if ($desc) { return @($list | Sort-Object Status, Name -Descending) } else { return @($list | Sort-Object Status, Name) } }
   if ($col -eq 'Subscribers') { if ($desc) { return @($list | Sort-Object { [long]$_.Subscribers }, Name -Descending) } else { return @($list | Sort-Object { [long]$_.Subscribers }, Name) } }
   if ($col -eq 'Rating') { if ($desc) { return @($list | Sort-Object { [int]$_.Stars }, Name -Descending) } else { return @($list | Sort-Object { [int]$_.Stars }, Name) } }
+  if ($col -eq 'Date') { if ($desc) { return @($list | Sort-Object { [string]$_.InstalledDate }, Name -Descending) } else { return @($list | Sort-Object { [string]$_.InstalledDate }, Name) } }
   if ($col -eq 'WorkshopId') { if ($desc) { return @($list | Sort-Object { [long]$_.WorkshopId }, Name -Descending) } else { return @($list | Sort-Object { [long]$_.WorkshopId }, Name) } }
   return ,$list
 }
@@ -4544,13 +4545,12 @@ function Refresh-GuiPacks {
     # Header sort indicators.
     if ($script:GuiPackList.View -and $script:GuiPackList.View.Columns) {
       $gvCols = $script:GuiPackList.View.Columns
-      $plain = @('Name', 'Mods', 'Installed', 'Created Date', 'Description')
-      for ($i = 0; $i -lt 5 -and ($i + 1) -lt $gvCols.Count; $i++) { $gvCols[$i + 1].Header = $plain[$i] }
+      $plain = @('Name', 'Mods', 'Installed', 'Description')
+      for ($i = 0; $i -lt 4 -and ($i + 1) -lt $gvCols.Count; $i++) { $gvCols[$i + 1].Header = $plain[$i] }
       if ($col -eq 'Name') { $gvCols[1].Header = if ($script:GuiPacksSortDescending) { 'Name (Z-A)' } else { 'Name (A-Z)' } }
       elseif ($col -eq 'Mods') { $gvCols[2].Header = if ($script:GuiPacksSortDescending) { 'Mods (9-0)' } else { 'Mods (0-9)' } }
       elseif ($col -eq 'Installed') { $gvCols[3].Header = if ($script:GuiPacksSortDescending) { 'Installed (9-0)' } else { 'Installed (0-9)' } }
-      elseif ($col -eq 'Date') { $gvCols[4].Header = if ($script:GuiPacksSortDescending) { 'Created Date (newest)' } else { 'Created Date (oldest)' } }
-      elseif ($col -eq 'Description') { $gvCols[5].Header = if ($script:GuiPacksSortDescending) { 'Description (Z-A)' } else { 'Description (A-Z)' } }
+      elseif ($col -eq 'Description') { $gvCols[4].Header = if ($script:GuiPacksSortDescending) { 'Description (Z-A)' } else { 'Description (A-Z)' } }
     }
     # Detail pane: members of the detail pack (first shown pack by default,
     # or the pack the user clicked). The detail pack survives refreshes.
@@ -4585,6 +4585,7 @@ function Refresh-GuiPackDetail($pack) {
     return
   }
   $installed = @(Get-InstalledWorkshopIds)
+  $installMap = Get-InstallMap
   $members = @(Get-PackModsFull $pack)
   $pStats = Get-WorkshopStats @($members | ForEach-Object { [string]$_.WorkshopId })
   $items = @()
@@ -4594,6 +4595,12 @@ function Refresh-GuiPackDetail($pack) {
     $psubs = [long]0; $prate = ''
     $pstars = 0
     if ($pStats -and $pStats.ContainsKey($pwid)) { $psubs = [long]$pStats[$pwid].Subscribers; $pstars = [int]$pStats[$pwid].Stars; $prate = Format-Stars $pstars }
+    # Installed date (blank when not installed - same rule as Mods tab).
+    $pdate = ''
+    if ($isInstalled -and $installMap -and $installMap.PSObject.Properties[$pwid]) {
+      $dv = $installMap.PSObject.Properties[$pwid].Value.installed_on
+      if ($dv) { $pdate = [string]$dv }
+    }
     $items += [PSCustomObject]@{
       Name = [string]$m.Name
       Category = [string]$m.Cat
@@ -4601,6 +4608,7 @@ function Refresh-GuiPackDetail($pack) {
       Subscribers = $psubs
       Rating = $prate
       Stars = [int]$pstars
+      InstalledDate = $pdate
       WorkshopId = $pwid
       IsChecked = $script:GuiSelectedMods.ContainsKey($pwid)
     }
@@ -4610,15 +4618,16 @@ function Refresh-GuiPackDetail($pack) {
   # Header sort indicators.
   if ($script:GuiPackMemberList.View -and $script:GuiPackMemberList.View.Columns) {
     $mpvCols = $script:GuiPackMemberList.View.Columns
-    $mpl = @('Name', 'Category', 'Status', 'Subscribers', 'Rating', 'Workshop ID')
-    for ($i = 0; $i -lt 6 -and ($i + 1) -lt $mpvCols.Count; $i++) { $mpvCols[$i + 1].Header = $mpl[$i] }
+    $mpl = @('Name', 'Category', 'Status', 'Subscribers', 'Rating', 'Installed Date', 'Workshop ID')
+    for ($i = 0; $i -lt 7 -and ($i + 1) -lt $mpvCols.Count; $i++) { $mpvCols[$i + 1].Header = $mpl[$i] }
     $mc = $script:GuiPackMembersSortColumn; $md = $script:GuiPackMembersSortDescending
     if ($mc -eq 'Name') { $mpvCols[1].Header = if ($md) { 'Name (Z-A)' } else { 'Name (A-Z)' } }
     elseif ($mc -eq 'Category') { $mpvCols[2].Header = if ($md) { 'Category (Z-A)' } else { 'Category (A-Z)' } }
     elseif ($mc -eq 'Status') { $mpvCols[3].Header = if ($md) { 'Status (Not installed first)' } else { 'Status (Installed first)' } }
     elseif ($mc -eq 'Subscribers') { $mpvCols[4].Header = if ($md) { 'Subscribers (9-0)' } else { 'Subscribers (0-9)' } }
     elseif ($mc -eq 'Rating') { $mpvCols[5].Header = if ($md) { 'Rating (5-0)' } else { 'Rating (0-5)' } }
-    elseif ($mc -eq 'WorkshopId') { $mpvCols[6].Header = if ($md) { 'Workshop ID (9-0)' } else { 'Workshop ID (0-9)' } }
+    elseif ($mc -eq 'Date') { $mpvCols[6].Header = if ($md) { 'Installed Date (newest)' } else { 'Installed Date (oldest)' } }
+    elseif ($mc -eq 'WorkshopId') { $mpvCols[7].Header = if ($md) { 'Workshop ID (9-0)' } else { 'Workshop ID (0-9)' } }
   }
   # Detail header select-all checkbox.
   if ($script:GuiPackMemberList.View -and $script:GuiPackMemberList.View.Columns -and $script:GuiPackMemberList.View.Columns.Count -gt 0) {
@@ -6609,7 +6618,6 @@ function Show-Gui {
                 <GridViewColumn Header="Name" Width="280" DisplayMemberBinding="{Binding Name}"/>
                 <GridViewColumn Header="Mods" Width="120" DisplayMemberBinding="{Binding Mods}"/>
                 <GridViewColumn Header="Installed" Width="110" DisplayMemberBinding="{Binding Installed}"/>
-                <GridViewColumn Header="Created Date" Width="180" DisplayMemberBinding="{Binding Date}"/>
                 <GridViewColumn HeaderContainerStyle="{StaticResource NoGripperHeader}" Header="Description" Width="200" DisplayMemberBinding="{Binding Description}"/>
               </GridView>
             </ListView.View>
@@ -6642,6 +6650,7 @@ function Show-Gui {
                 <GridViewColumn Header="Status" Width="150" DisplayMemberBinding="{Binding Status}"/>
                 <GridViewColumn Header="Subscribers" Width="120" DisplayMemberBinding="{Binding Subscribers, StringFormat='{}{0:N0}'}"/>
                 <GridViewColumn Header="Rating" Width="100" DisplayMemberBinding="{Binding Rating}"/>
+                <GridViewColumn Header="Installed Date" Width="180" DisplayMemberBinding="{Binding InstalledDate}"/>
                 <GridViewColumn HeaderContainerStyle="{StaticResource NoGripperHeader}" Header="Workshop ID" Width="150" DisplayMemberBinding="{Binding WorkshopId}"/>
               </GridView>
             </ListView.View>
@@ -6901,8 +6910,7 @@ function Show-Gui {
           if ($idx -eq 1) { $sortCol = 'Name' }
           elseif ($idx -eq 2) { $sortCol = 'Mods' }
           elseif ($idx -eq 3) { $sortCol = 'Installed' }
-          elseif ($idx -eq 4) { $sortCol = 'Date' }
-          elseif ($idx -eq 5) { $sortCol = 'Description' }
+          elseif ($idx -eq 4) { $sortCol = 'Description' }
           if ($sortCol) { Cycle-GuiPacksSort $sortCol }
         }
       }
@@ -6961,7 +6969,8 @@ function Show-Gui {
           elseif ($idx -eq 3) { $sortCol = 'Status' }
           elseif ($idx -eq 4) { $sortCol = 'Subscribers' }
           elseif ($idx -eq 5) { $sortCol = 'Rating' }
-          elseif ($idx -eq 6) { $sortCol = 'WorkshopId' }
+          elseif ($idx -eq 6) { $sortCol = 'Date' }
+          elseif ($idx -eq 7) { $sortCol = 'WorkshopId' }
           if ($sortCol) { Cycle-GuiPackMembersSort $sortCol }
         }
       }
