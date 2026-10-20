@@ -1,7 +1,7 @@
 # PZ Mod Manager - Created by duy64. Licensed under the MIT License (see LICENSE.txt).
 #Requires -Version 5.1
 <#
-  PZ Mod Manager v414 - B42 Essentials: mod pack for Single-Player & Multiplayer
+  PZ Mod Manager v415 - B42 Essentials: mod pack for Single-Player & Multiplayer
   Full collection (~190 mods) + Cheat Menu: Rebuild, no Steam client needed.
 #>
 $ErrorActionPreference = 'Stop'
@@ -17,7 +17,7 @@ $NL          = [Environment]::NewLine
 # Target game build. B43 = change these lines; the layout repair and [10] checks derive from them.
 $GameBuild = '42'      # major build: version folder name (42/)
 $GameBuildFull = '42.21'  # current full build: versionMax floor for [10] warnings
-$ScriptVersion = '414'    # app version: shown in the menu header + GUI title
+$ScriptVersion = '415'    # app version: shown in the menu header + GUI title
 
 # All known categories, including ones with zero mods right now (Maps /
 # Audio / Zombies have no catalog mods yet). The category editor lists
@@ -7071,6 +7071,10 @@ function Show-Gui {
         if ($pk -and $pk.Custom) { $selCustom += $nm }
       }
       $script:GuiPackRenameDeleteRenameItem.IsEnabled = ($selCustom.Count -eq 1)
+      # Self-explanatory disabled state: rename/delete apply to custom
+      # packs only; built-in packs cannot be renamed or deleted.
+      if ($selCustom.Count -eq 1) { $script:GuiPackRenameDeleteRenameItem.Header = 'Rename Selected Pack...' }
+      else { $script:GuiPackRenameDeleteRenameItem.Header = 'Rename Selected Pack... (custom packs only)' }
       $script:GuiPackRenameDeleteDeleteItem.IsEnabled = ($selCustom.Count -gt 0)
       $script:GuiPackRenameDeleteDeleteItem.Header = ('Delete selected packs (' + $selCustom.Count + ' custom)')
     })

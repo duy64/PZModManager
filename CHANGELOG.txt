@@ -1,6 +1,7 @@
 PZ MOD MANAGER - FULL CHANGELOG
 Created by duy64. Licensed under the MIT License (see LICENSE.txt).
 
+v415: Pack Rename menu item now says '(custom packs only)' when disabled, so it is clear why rename is unavailable for built-in packs.
 v414: Merged the redundant Mods and Installed columns on the Packs and Categories tabs into a single Installed column (installed/total). Categories tab status bar now also shows the total mod count.
 v413: Installed Date column added to the Packs tab member table (bottom table, same as Mods tab - blank when not installed, sortable). Removed the Created Date column from the top packs table again (it belongs on the Lists tab).
 v412: Restored the Created Date column on the Packs tab (removed in v406 - built-in packs show blank since they have no stored date; custom packs show theirs).
