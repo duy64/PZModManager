@@ -1,7 +1,7 @@
 # PZ Mod Manager - Created by duy64. Licensed under the MIT License (see LICENSE.txt).
 #Requires -Version 5.1
 <#
-  PZ Mod Manager v433 - B42 Essentials: mod pack for Single-Player & Multiplayer
+  PZ Mod Manager v434 - B42 Essentials: mod pack for Single-Player & Multiplayer
   Full collection (~190 mods) + Cheat Menu: Rebuild, no Steam client needed.
 #>
 $ErrorActionPreference = 'Stop'
@@ -17,7 +17,7 @@ $NL          = [Environment]::NewLine
 # Target game build. B43 = change these lines; the layout repair and [10] checks derive from them.
 $GameBuild = '42'      # major build: version folder name (42/)
 $GameBuildFull = '42.21'  # current full build: versionMax floor for [10] warnings
-$ScriptVersion = '433'    # app version: shown in the menu header + GUI title
+$ScriptVersion = '434'    # app version: shown in the menu header + GUI title
 
 # All known categories, including ones with zero mods right now (Maps /
 # Audio / Zombies have no catalog mods yet). The category editor lists
@@ -1355,6 +1355,7 @@ function Get-ConDecisions($modRows) {
   # inside WPF event handlers when the variable resolves to $null.
   $dec = @{}
   foreach ($mr in $modRows) {
+    if ($mr.Locked) { continue }
     $ki = @(); $kid = @()
     foreach ($vc in @($mr.Candidates)) { if ([bool]$vc.IsChecked) { $ki += [int]$vc.VariantIndex; $kid += [string]$vc.WorkshopId } }
     $dec[[string]$mr.WorkshopId] = @{ KeptIndices = $ki; KeptIds = $kid }
@@ -1368,6 +1369,7 @@ function Refresh-ConKeptColumn($modRows, $modsList) {
   # assigning the same array does not regenerate the rows (WPF
   # reuses the stale containers). Preserve the selection.
   foreach ($mr in $modRows) {
+    if ($mr.Locked) { continue }
     $k = @($mr.Candidates | Where-Object { [bool]$_.IsChecked }).Count
     $t = $mr.Candidates.Count
     if ($k -eq $t) { $mr.Kept = 'All kept' }
@@ -1432,7 +1434,9 @@ function Show-GuiConsolidatedVariantPicker($pendingMods) {
       $kept = 'All kept'
       if ($k -eq 0) { $kept = 'Skipped' }
       elseif ($k -lt $cands.Count) { $kept = ('{0} of {1} kept' -f $k, $cands.Count) }
-      $modRows += [PSCustomObject]@{ Index = $mi; Name = [string]$pm.Name; WorkshopId = [string]$pm.WorkshopId; Kept = $kept; Candidates = $cands }
+      $isLocked = ([string]$pm.Kind -eq 'Locked')
+      if ($isLocked) { $kept = 'Kept as-is' }
+      $modRows += [PSCustomObject]@{ Index = $mi; Name = [string]$pm.Name; WorkshopId = [string]$pm.WorkshopId; Kept = $kept; Candidates = $cands; Locked = $isLocked; LockedReason = [string]$pm.LockedReason }
     }
     [xml]$xaml = @'
 <Window xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
@@ -1502,7 +1506,7 @@ function Show-GuiConsolidatedVariantPicker($pendingMods) {
     $c3 = New-Object System.Windows.Controls.GridViewColumn; $c3.Header = 'Kept'; $c3.Width = 150; $c3.DisplayMemberBinding = New-Object System.Windows.Data.Binding('Kept'); $c3.HeaderContainerStyle = $noGripper; [void]$modsGrid.Columns.Add($c3)
     Register-LastColumnFill $modsList
     # Bottom table: standard checkbox + Name / Mod ID / Build.
-    $checkTpl = [System.Windows.Markup.XamlReader]::Parse('<DataTemplate xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"><CheckBox IsChecked="{Binding IsChecked}" HorizontalAlignment="Center" VerticalAlignment="Center"/></DataTemplate>')
+    $checkTpl = [System.Windows.Markup.XamlReader]::Parse('<DataTemplate xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"><CheckBox IsChecked="{Binding IsChecked}" IsEnabled="{Binding IsEnabled}" HorizontalAlignment="Center" VerticalAlignment="Center"/></DataTemplate>')
     Build-StandardGridColumns $varsGrid @(@{ Header = 'Name'; Property = 'Name'; Width = 500 }, @{ Header = 'Mod ID'; Property = 'WorkshopId'; Width = 300 }, @{ Header = 'Build'; Property = 'Cat'; Width = 150 }) $checkTpl $noGripper
     Register-LastColumnFill $varsList
     # Top selection: show this mod's variants below.
@@ -1511,7 +1515,8 @@ function Show-GuiConsolidatedVariantPicker($pendingMods) {
       $w = [System.Windows.Window]::GetWindow($sender); if (-not $w) { return }
       $sel = $sender.SelectedItem
       $vl = $w.FindName('ConVariants'); if ($vl) { if ($sel) { $vl.ItemsSource = @($sel.Candidates) } else { $vl.ItemsSource = @() } }
-      $w.FindName('ConDetail').Text = 'Click a version below to read its full description here.'
+      if ($sel -and $sel.Locked) { $w.FindName('ConDetail').Text = [string]$sel.LockedReason }
+      else { $w.FindName('ConDetail').Text = 'Click a version below to read its full description here.' }
       # Standard: View this mod on Workshop needs a highlighted row
       # with a numeric Workshop ID whose Name is not just the ID.
       $w.FindName('ConWorkshop').IsEnabled = ($null -ne $sel -and [string]$sel.WorkshopId -match '^\d+$' -and [string]$sel.Name -ne '' -and [string]$sel.Name -ne [string]$sel.WorkshopId)
@@ -1533,8 +1538,8 @@ function Show-GuiConsolidatedVariantPicker($pendingMods) {
       }
       $w = [System.Windows.Window]::GetWindow($sender); if ($w) { $w.FindName('ConDetail').Text = $txt }
     })
-    $window.FindName('ConSelectAll').Add_Click({ param($sender, $e); $w = [System.Windows.Window]::GetWindow($sender); if (-not $w) { return }; $ml = $w.FindName('ConMods'); $vl = $w.FindName('ConVariants'); if (-not $ml -or -not $vl) { return }; $cur = $ml.SelectedItem; if ($cur) { foreach ($r in @($cur.Candidates)) { $r.IsChecked = $true }; $vl.ItemsSource = @($cur.Candidates); Refresh-ConKeptColumn @($ml.ItemsSource) $ml } })
-    $window.FindName('ConClear').Add_Click({ param($sender, $e); $w = [System.Windows.Window]::GetWindow($sender); if (-not $w) { return }; $ml = $w.FindName('ConMods'); $vl = $w.FindName('ConVariants'); if (-not $ml -or -not $vl) { return }; $cur = $ml.SelectedItem; if ($cur) { foreach ($r in @($cur.Candidates)) { $r.IsChecked = $false }; $vl.ItemsSource = @($cur.Candidates); Refresh-ConKeptColumn @($ml.ItemsSource) $ml } })
+    $window.FindName('ConSelectAll').Add_Click({ param($sender, $e); $w = [System.Windows.Window]::GetWindow($sender); if (-not $w) { return }; $ml = $w.FindName('ConMods'); $vl = $w.FindName('ConVariants'); if (-not $ml -or -not $vl) { return }; $cur = $ml.SelectedItem; if ($cur -and -not $cur.Locked) { foreach ($r in @($cur.Candidates)) { $r.IsChecked = $true }; $vl.ItemsSource = @($cur.Candidates); Refresh-ConKeptColumn @($ml.ItemsSource) $ml } })
+    $window.FindName('ConClear').Add_Click({ param($sender, $e); $w = [System.Windows.Window]::GetWindow($sender); if (-not $w) { return }; $ml = $w.FindName('ConMods'); $vl = $w.FindName('ConVariants'); if (-not $ml -or -not $vl) { return }; $cur = $ml.SelectedItem; if ($cur -and -not $cur.Locked) { foreach ($r in @($cur.Candidates)) { $r.IsChecked = $false }; $vl.ItemsSource = @($cur.Candidates); Refresh-ConKeptColumn @($ml.ItemsSource) $ml } })
     $result = @{ Decisions = $null; CancelAll = $false; Cancelled = $false }
     $window.Tag = $result
     # Store the result hashtable on the window's Tag so the
@@ -2068,6 +2073,29 @@ function Install-Mod([string]$WorkshopId, [string]$Name) {
   $map0 = Get-InstallMap
   if ($map0) {
     $prop0 = $map0.PSObject.Properties[$WorkshopId]
+    if ($prop0 -and $prop0.Value.installed -ne $true -and $prop0.Value.folders) {
+      # Stale record: marked not installed, but folders are on disk
+      # (an interrupted install-map write - the record is a fossil
+      # while the files are real). Trust the disk: rebuild the entry
+      # from the folders that actually exist, then let the normal
+      # skip check below judge the healed record.
+      $present = @($prop0.Value.folders | Where-Object { Test-Path (Join-Path (Join-Path $ModsDir ([string]$_)) 'mod.info') })
+      if ($present.Count -gt 0) {
+        $prop0.Value.installed = $true
+        $prop0.Value.folders = $present
+        $healVariants = @()
+        foreach ($hf in $present) {
+          $hid = Get-ModInfoId (Join-Path (Join-Path $ModsDir $hf) 'mod.info')
+          if ($hid -ne '' -and $healVariants -notcontains $hid) { $healVariants += $hid }
+        }
+        if ($healVariants.Count -gt 0) {
+          if ($prop0.Value.PSObject.Properties['variants']) { $prop0.Value.variants = $healVariants }
+          else { $prop0.Value | Add-Member -NotePropertyName 'variants' -NotePropertyValue $healVariants }
+        }
+        Save-InstallMap $map0
+        Write-Host ("  Repaired the install record for " + $Name + " from disk (it was marked not installed, but its files are there).") -ForegroundColor Yellow
+      }
+    }
     if ($prop0 -and $prop0.Value.installed -eq $true -and $prop0.Value.folders) {
       $allThere = $true
       $hasGeneric = $false
@@ -2438,14 +2466,16 @@ function Expand-PackIds($pack, $catalog) {
 
 
 function Get-InstalledWorkshopIds {
-  # Installed = map says installed AND at least one recorded folder really exists on disk with mod.info.
-  # Map-only records (folder deleted, or [10] cleaned) must NOT count as installed.
+  # Installed = at least one recorded folder really exists on disk with mod.info.
+  # The disk is the truth: map-only records (folder deleted) must NOT
+  # count, and a stale installed=false flag must NOT hide a mod whose
+  # files are actually there (interrupted writes left such records).
   $map = Get-InstallMap
   $ids = @()
   if ($map) {
     foreach ($p in $map.PSObject.Properties) {
       if ([string]$p.Name -notmatch '^\d+$') { continue }
-      if ($p.Value.installed -eq $true -and $p.Value.folders) {
+      if ($p.Value.folders) {
         foreach ($f in @($p.Value.folders)) {
           if (Test-Path (Join-Path (Join-Path $ModsDir ([string]$f)) 'mod.info')) { $ids += [string]$p.Name; break }
         }
@@ -4863,7 +4893,7 @@ function Get-CompatibilityReport {
   if ($installMap) {
     foreach ($p in $installMap.PSObject.Properties) {
       if ([string]$p.Name -notmatch '^\d+$') { continue }
-      if ($p.Value.installed -eq $true -and $p.Value.folders) {
+      if ($p.Value.folders) {
         $widToFolders[[string]$p.Name] = @($p.Value.folders | ForEach-Object { [string]$_ })
       }
     }
@@ -5763,6 +5793,7 @@ function Manage-GuiModVariants {
   $considered = 0; $changedMods = 0; $removedFolders = 0; $mapDirty = $false
   $pendingManage = @()
   $autoNotes = @()
+  $lockedManage = @()
   foreach ($id in $ids) {
     $prop = $map.PSObject.Properties[[string]$id]
     if (-not $prop) { continue }
@@ -5786,13 +5817,26 @@ function Manage-GuiModVariants {
       $rsn = [string]$selRes.SkipReason
       if ($rsn -eq '') { $rsn = 'no choice needed - kept all versions' }
       $autoNotes += ($modName + ': ' + $rsn)
+      # Display-only locked entry: if a consolidated picker opens for
+      # other mods, this mod is listed there too (checkboxes locked,
+      # reason shown) so a selected mod never silently vanishes.
+      $lockedCands = @()
+      $li = 0
+      foreach ($lf in @($selRes.Folders)) {
+        $lmi = Join-Path $lf.FullName 'mod.info'
+        $lName = [string]$lf.Name
+        try { $lm = [regex]::Match((Get-Content $lmi -Raw -ErrorAction Stop), '(?m)^\s*name\s*=\s*(.+?)\s*$'); if ($lm.Success) { $lName = $lm.Groups[1].Value.Trim() } } catch { }
+        $lockedCands += [PSCustomObject]@{ Name = $lName; WorkshopId = [string](Get-ModInfoId $lmi); Cat = ''; Details = ('Kept as-is: ' + $rsn); VariantIndex = $li; IsChecked = $true; IsEnabled = $false }
+        $li++
+      }
+      $lockedManage += [PSCustomObject]@{ WorkshopId = [string]$id; Name = [string]$modName; Candidates = $lockedCands; Kind = 'Locked'; LockedReason = ('Kept as-is: ' + $rsn) }
       $ap = Apply-ManageVariantDecision $prop $folders @($selRes.Folders) $selRes.CarryVariants @($selRes.DroppedIds) $storedV
       if ($ap.Changed) { $changedMods++; $removedFolders += $ap.RemovedFolders; $mapDirty = $true }
     }
   }
   # Consolidated picker: decide ALL deferred mods at once.
   if ($pendingManage.Count -gt 0) {
-    $conRes = Show-GuiConsolidatedVariantPicker $pendingManage
+    $conRes = Show-GuiConsolidatedVariantPicker (@($pendingManage) + @($lockedManage))
     if ($conRes.CancelAll) {
       $script:AbortVariantBatch = $true
     } elseif ($conRes.Decisions) {
