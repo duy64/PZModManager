@@ -1,7 +1,7 @@
 # PZ Mod Manager - Created by duy64. Licensed under the MIT License (see LICENSE.txt).
 #Requires -Version 5.1
 <#
-  PZ Mod Manager v434 - B42 Essentials: mod pack for Single-Player & Multiplayer
+  PZ Mod Manager v435 - B42 Essentials: mod pack for Single-Player & Multiplayer
   Full collection (~190 mods) + Cheat Menu: Rebuild, no Steam client needed.
 #>
 $ErrorActionPreference = 'Stop'
@@ -17,7 +17,7 @@ $NL          = [Environment]::NewLine
 # Target game build. B43 = change these lines; the layout repair and [10] checks derive from them.
 $GameBuild = '42'      # major build: version folder name (42/)
 $GameBuildFull = '42.21'  # current full build: versionMax floor for [10] warnings
-$ScriptVersion = '434'    # app version: shown in the menu header + GUI title
+$ScriptVersion = '435'    # app version: shown in the menu header + GUI title
 
 # All known categories, including ones with zero mods right now (Maps /
 # Audio / Zombies have no catalog mods yet). The category editor lists
@@ -2833,7 +2833,7 @@ function Build-StandardGridColumns($gridView, $columns, $checkTemplate, $noGripp
   $gridView.Columns[$gridView.Columns.Count - 1].HeaderContainerStyle = $noGripperStyle
 }
 
-function Show-GuiWpfPicker([string]$title, [string]$instruction, $candidates, $columns, [string]$addButtonText, [switch]$ShowCancelAll) {
+function Show-GuiWpfPicker([string]$title, [string]$instruction, $candidates, $columns, [string]$addButtonText, [switch]$ShowCancelAll, [string]$ExtraButtonText = '') {
   # Shared WPF picker dialog (replaces the WinForms DataGridView pickers,
   # whose column sizing kept fighting the scrollbar/font scale across
   # v267-v273). Same ListView + GridView pattern as the main tabs, so
@@ -2843,7 +2843,7 @@ function Show-GuiWpfPicker([string]$title, [string]$instruction, $candidates, $c
   # $columns: @( @{ Header='Name'; Property='Name'; Width=500 }, ... )
   # $addButtonText: 'Add Selected' (ModPicker).
   # Returns @{ Selected; Failed; NoCandidates }.
-  if (@($candidates).Count -eq 0) { return [PSCustomObject]@{ Selected = @(); Failed = $false; NoCandidates = $true; CancelAll = $false } }
+  if (@($candidates).Count -eq 0) { return [PSCustomObject]@{ Selected = @(); Failed = $false; NoCandidates = $true; CancelAll = $false; ExtraClicked = $false } }
   try {
     Add-Type -AssemblyName PresentationFramework -ErrorAction Stop
     Add-Type -AssemblyName PresentationCore -ErrorAction Stop
@@ -2900,6 +2900,7 @@ function Show-GuiWpfPicker([string]$title, [string]$instruction, $candidates, $c
       <Button x:Name="PickerAdd" Padding="12,4" Margin="390,0,8,0"/>
       <Button x:Name="PickerCancel" Content="Cancel" Padding="12,4" Margin="0,0,8,0"/>
       <Button x:Name="PickerCancelAll" Content="Cancel All" Padding="12,4" Visibility="Collapsed"/>
+      <Button x:Name="PickerExtra" Padding="12,4" Margin="8,0,0,0" Visibility="Collapsed"/>
     </StackPanel>
   </Grid>
 </Window>
@@ -2993,10 +2994,16 @@ function Show-GuiWpfPicker([string]$title, [string]$instruction, $candidates, $c
       }
     })
     $window.FindName('PickerSearchBox').Add_TextChanged({ $state.Query = [string]$window.FindName('PickerSearchBox').Text; & $refresh })
-    $result = @{ Selected = $null }
+    $result = @{ Selected = $null; ExtraClicked = $false }
     $cancelAllBtn = $window.FindName('PickerCancelAll')
     if ($ShowCancelAll) { $cancelAllBtn.Visibility = [System.Windows.Visibility]::Visible }
     $cancelAllBtn.Add_Click({ $result.CancelAll = $true; $window.Close() })
+    $extraBtn = $window.FindName('PickerExtra')
+    if ($ExtraButtonText -ne '') {
+      $extraBtn.Content = $ExtraButtonText
+      $extraBtn.Visibility = [System.Windows.Visibility]::Visible
+      $extraBtn.Add_Click({ $result.ExtraClicked = $true; $window.Close() })
+    }
     $window.FindName('PickerAdd').Add_Click({
       $sel = @()
       foreach ($r in $rows) { if ([bool]$r.IsChecked) { $sel += $candidates[$r.Index] } }
@@ -3009,11 +3016,12 @@ function Show-GuiWpfPicker([string]$title, [string]$instruction, $candidates, $c
     [void]$window.ShowDialog()
     $cancelAll = $false
     if ($result.ContainsKey('CancelAll')) { $cancelAll = [bool]$result.CancelAll }
-    if ($result.Selected -eq $null -or @($result.Selected).Count -eq 0) { return [PSCustomObject]@{ Selected = @(); Failed = $false; NoCandidates = $false; CancelAll = $cancelAll } }
-    return [PSCustomObject]@{ Selected = $result.Selected; Failed = $false; NoCandidates = $false; CancelAll = $cancelAll }
+    $extraClicked = [bool]$result.ExtraClicked
+    if ($result.Selected -eq $null -or @($result.Selected).Count -eq 0) { return [PSCustomObject]@{ Selected = @(); Failed = $false; NoCandidates = $false; CancelAll = $cancelAll; ExtraClicked = $extraClicked } }
+    return [PSCustomObject]@{ Selected = $result.Selected; Failed = $false; NoCandidates = $false; CancelAll = $cancelAll; ExtraClicked = $extraClicked }
   } catch {
     $script:LastPickerError = $_.Exception.Message + ' || STACK: ' + [string]$_.ScriptStackTrace
-    return [PSCustomObject]@{ Selected = @(); Failed = $true; NoCandidates = $false; CancelAll = $false }
+    return [PSCustomObject]@{ Selected = @(); Failed = $true; NoCandidates = $false; CancelAll = $false; ExtraClicked = $false }
   }
 }
 
@@ -5753,6 +5761,31 @@ function Open-GuiWorkshopPage {
   if ($wid -match '^\d+$' -and $nm -ne '' -and $nm -ne $wid) { Start-Process ('https://steamcommunity.com/sharedfiles/filedetails/?id=' + $wid) }
 }
 
+function Test-VariantFamily($dirs) {
+  # True when any variant folder's mod.info require= names another
+  # variant folder in the same set (a core + module family, not
+  # alternatives). Same test Select-KeptVariants uses to skip the
+  # picker; Manage Variants uses it to decide whether a mod has
+  # anything revisable at all.
+  $ids = @()
+  foreach ($d in @($dirs)) { $midF = Get-ModInfoId (Join-Path $d.FullName 'mod.info'); if ($midF -ne '') { $ids += [string]$midF } }
+  if ($ids.Count -le 1) { return $false }
+  $idSet = @{}
+  foreach ($i in $ids) { $idSet[$i] = $true }
+  foreach ($d in @($dirs)) {
+    $ownF = Get-ModInfoId (Join-Path $d.FullName 'mod.info')
+    $rawF = ''
+    try { $rawF = Get-Content (Join-Path $d.FullName 'mod.info') -Raw -ErrorAction Stop } catch { }
+    $rM = [regex]::Match($rawF, '(?m)^\s*require\s*=\s*(.+?)\s*$')
+    if ($rM.Success) {
+      foreach ($rid in @($rM.Groups[1].Value -split '[,;]' | ForEach-Object { $_.Trim().TrimStart('\') } | Where-Object { $_ -ne '' })) {
+        if ($idSet.ContainsKey($rid) -and $rid -ne $ownF) { return $true }
+      }
+    }
+  }
+  return $false
+}
+
 function Manage-GuiModVariants {
   $script:AbortVariantBatch = $false
   # Manage variants: lists EVERY installed mod with multiple variant
@@ -5767,7 +5800,7 @@ function Manage-GuiModVariants {
   foreach ($prop in @($map.PSObject.Properties)) {
     $cid = [string]$prop.Name
     if ($cid -notmatch '^\d+$') { continue }
-    if ($prop.Value.installed -ne $true -or -not $prop.Value.folders) { continue }
+    if (-not $prop.Value.folders) { continue }
     $cfolders = @($prop.Value.folders | ForEach-Object { [string]$_ })
     if ($cfolders.Count -le 1) { continue }
     $cdirs = @()
@@ -5776,6 +5809,16 @@ function Manage-GuiModVariants {
       if (Test-Path $cfull) { $cdirs += (Get-Item $cfull) }
     }
     if ($cdirs.Count -le 1) { continue }
+    # Only mods with a real choice belong in Manage Variants: after
+    # the build filter at least two versions must remain, and the
+    # versions must not be a dependency-linked module family
+    # (nothing can ever be dropped from a family, so there is
+    # nothing to revise - listing them is pure noise).
+    $verDirs = @($cdirs | Where-Object { Test-ModVersionMatches (Join-Path $_.FullName 'mod.info') })
+    $effDirs = $cdirs
+    if ($verDirs.Count -gt 0) { $effDirs = $verDirs }
+    if ($effDirs.Count -le 1) { continue }
+    if (Test-VariantFamily $effDirs) { continue }
     $cName = $cid
     $cfm = @($Mods | Where-Object { [string]$_.WorkshopId -eq $cid })[0]
     if ($cfm) { $cName = [string]$cfm.Name }
@@ -5786,7 +5829,26 @@ function Manage-GuiModVariants {
     @{ Header = 'Name'; Property = 'Name'; Width = 500 },
     @{ Header = 'Variants'; Property = 'VariantCount'; Width = 100 },
     @{ Header = 'Workshop ID'; Property = 'WorkshopId'; Width = 150 }
-  ) 'Manage Selected'
+  ) 'Manage Selected' -ExtraButtonText 'Reset All Variant Choices'
+  if ($pick.ExtraClicked) {
+    # Reset all: clear every stored variant choice (folders on disk
+    # are not touched). Choices will be asked again on the next
+    # install, update, or Manage Variants.
+    $yn = Show-GuiMessageBox 'Reset all variant choices? Every stored version choice will be cleared. Installed folders are not touched, and choices will be asked again on the next install, update, or Manage Variants.' 'Reset All Variant Choices' ([System.Windows.MessageBoxButton]::YesNo) ([System.Windows.MessageBoxImage]::Question)
+    if ($yn -ne [System.Windows.MessageBoxResult]::Yes) { Set-GuiTransientStatus ('Reset cancelled.'); return }
+    $mapR = Get-InstallMap
+    $resetCount = 0
+    if ($mapR) {
+      foreach ($rp in @($mapR.PSObject.Properties)) {
+        if ([string]$rp.Name -notmatch '^\d+$') { continue }
+        if ($rp.Value.PSObject.Properties['variants']) { $rp.Value.PSObject.Properties.Remove('variants'); $resetCount++ }
+      }
+      if ($resetCount -gt 0) { Save-InstallMap $mapR }
+    }
+    if ($resetCount -eq 0) { Set-GuiTransientStatus ('No stored variant choices to reset.') }
+    else { Set-GuiTransientStatus ('Variant choices reset for ' + $resetCount + ' mod(s) - choices will be asked again.') }
+    return
+  }
   if ($pick.Failed -or $pick.CancelAll) { return }
   $ids = @($pick.Selected | ForEach-Object { [string]$_.WorkshopId })
   if ($ids.Count -eq 0) { return }
