@@ -1,6 +1,7 @@
 PZ MOD MANAGER - FULL CHANGELOG
 Created by duy64. Licensed under the MIT License (see LICENSE.txt).
 
+v403: Revised variant system. Manage Variants (Tools menu) now lists all installed multi-variant mods - no pre-selection needed. Consolidated picker buttons renamed for clarity: Apply Selection / Keep All Versions / Abort Batch (was Keep Selected Versions / Cancel / Cancel All).
 v402: Fixed phantom 'updates available' for freshly installed mods. The update check used file modification times, which change on every SteamCMD re-download even when content is identical. Stamps are now SHA256 content hashes (paths + sizes + bytes), so identical downloads correctly compare as up-to-date. NOTE: first check after upgrading re-baselines once (installed mods show as updates one time).
 v401: Mods tab: swapped rows so Move to sits with the other inputs (Search, ID/URL), and Install/Uninstall sit right above the list.
 v400: Mods tab layout: Install/Uninstall Selected on their own row. Move To Category on its own row with a 'Move to:' label (Width 50) so Search, ID/URL, and Move to text boxes all line up.

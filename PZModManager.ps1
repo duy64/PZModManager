@@ -1,7 +1,7 @@
 # PZ Mod Manager - Created by duy64. Licensed under the MIT License (see LICENSE.txt).
 #Requires -Version 5.1
 <#
-  PZ Mod Manager v402 - B42 Essentials: mod pack for Single-Player & Multiplayer
+  PZ Mod Manager v403 - B42 Essentials: mod pack for Single-Player & Multiplayer
   Full collection (~190 mods) + Cheat Menu: Rebuild, no Steam client needed.
 #>
 $ErrorActionPreference = 'Stop'
@@ -17,7 +17,7 @@ $NL          = [Environment]::NewLine
 # Target game build. B43 = change these lines; the layout repair and [10] checks derive from them.
 $GameBuild = '42'      # major build: version folder name (42/)
 $GameBuildFull = '42.21'  # current full build: versionMax floor for [10] warnings
-$ScriptVersion = '402'    # app version: shown in the menu header + GUI title
+$ScriptVersion = '403'    # app version: shown in the menu header + GUI title
 
 # All known categories, including ones with zero mods right now (Maps /
 # Audio / Zombies have no catalog mods yet). The category editor lists
@@ -1488,9 +1488,9 @@ function Show-GuiConsolidatedVariantPicker($pendingMods) {
       <Button x:Name="ConSelectAll" Content="Select All Versions" Padding="12,4" Margin="0,0,8,0"/>
       <Button x:Name="ConClear" Content="Deselect All Versions" Padding="12,4" Margin="0,0,8,0"/>
       <Button x:Name="ConWorkshop" Content="View Mod's Page" Padding="12,4" Margin="180,0,8,0"/>
-      <Button x:Name="ConKeep" Content="Keep Selected Versions" Padding="12,4" Margin="0,0,8,0"/>
-      <Button x:Name="ConCancel" Content="Cancel" Padding="12,4" Margin="0,0,8,0"/>
-      <Button x:Name="ConCancelAll" Content="Cancel All" Padding="12,4"/>
+      <Button x:Name="ConKeep" Content="Apply Selection" Padding="12,4" Margin="0,0,8,0"/>
+      <Button x:Name="ConCancel" Content="Keep All Versions" Padding="12,4" Margin="0,0,8,0"/>
+      <Button x:Name="ConCancelAll" Content="Abort Batch" Padding="12,4"/>
     </StackPanel>
   </Grid>
 </Window>
@@ -1498,7 +1498,7 @@ function Show-GuiConsolidatedVariantPicker($pendingMods) {
     $reader = New-Object System.Xml.XmlNodeReader($xaml)
     $window = [System.Windows.Markup.XamlReader]::Load($reader)
     Add-NoGripperHandler $window
-    $window.FindName('ConInstruction').Text = 'These Workshop items have multiple versions compatible with build ' + $GameBuildFull + '. Select a mod above to see its versions below, then tick the versions to keep for each mod. Untick all versions for a mod to skip installing it. Select all versions / Deselect all versions apply to the mod highlighted above. Keep selected versions confirms the ticked versions for EVERY mod in this list. Cancel keeps all versions for every mod; Cancel all aborts the whole batch.'
+    $window.FindName('ConInstruction').Text = 'These Workshop items have multiple versions compatible with build ' + $GameBuildFull + '. Select a mod above to see its versions below, then tick the versions to keep for each mod. Untick all versions for a mod to skip installing it. Select all versions / Deselect all versions apply to the mod highlighted above. Keep selected versions confirms the ticked versions for EVERY mod in this list. Keep All Versions keeps every version for every mod; Abort Batch stops the whole batch.'
     if ($script:GuiWindow) { $window.Owner = $script:GuiWindow }
     Set-DialogWindowIcon $window
     $modsList = $window.FindName('ConMods')
@@ -3773,7 +3773,7 @@ function Update-GuiSelectionButtons {
   # the selection meets its requirement (exactly one for View on
   # Workshop, at least one for the rest). Same rule on every tab.
   if ($script:GuiModRemoveFromListButton) { $script:GuiModRemoveFromListButton.IsEnabled = ($n -gt 0) }
-  if ($script:GuiVariantsButton) { $script:GuiVariantsButton.IsEnabled = ($n -gt 0) }
+
   if ($script:GuiModMoveToCategoryButton) { $script:GuiModMoveToCategoryButton.IsEnabled = ($n -gt 0) }
   Sync-GuiHeaderCheckbox $script:GuiModList 'SelectAll' $script:GuiModsShownIds $script:GuiSelectedMods
 }
@@ -5455,30 +5455,47 @@ function Open-GuiWorkshopPage {
 
 function Manage-GuiModVariants {
   $script:AbortVariantBatch = $false
-  # Mods tab: Manage variants. For each checked mod that is installed,
-  # apply the version filter + same-version picker (Select-KeptVariants)
-  # to its ALREADY-INSTALLED variant folders (no download). Dropped
-  # variant folders are deleted; the map entry is updated (folders +
-  # variants). This is how already-installed mods get a variant pick -
+  # Manage variants: lists EVERY installed mod with multiple variant
+  # folders (no pre-selection needed). Pick the mod(s) to revise, then
+  # the variant picker opens with the current choice pre-ticked.
+  # Dropped variant folders are deleted; the map entry is updated.
+  # This is how already-installed mods get a variant pick revised -
   # Install's picker only fires on (re)install / update.
-  # Two-phase: every multi-variant mod is collected (no popup per
-  # mod), then ONE consolidated picker decides them all at once.
-  # -ForcePicker: the picker opens even for mods with a stored
-  # choice (pre-ticked), so the user can REVISE a choice made at
-  # install time. Without it, Manage variants would report "no
-  # changes" for any mod whose stored choice covers all variants
-  # and never let the user change it.
-  if (-not $script:GuiSelectedMods -or $script:GuiSelectedMods.Count -eq 0) { Set-GuiTransientStatus ('Select at least one mod first.'); return }
   $map = Get-InstallMap
   if (-not $map) { Set-GuiTransientStatus ('No installed mods found.'); return }
-  $ids = @($script:GuiSelectedMods.Keys)
+  $candidates = @()
+  foreach ($prop in @($map.PSObject.Properties)) {
+    $cid = [string]$prop.Name
+    if ($cid -notmatch '^\d+$') { continue }
+    if ($prop.Value.installed -ne $true -or -not $prop.Value.folders) { continue }
+    $cfolders = @($prop.Value.folders | ForEach-Object { [string]$_ })
+    if ($cfolders.Count -le 1) { continue }
+    $cdirs = @()
+    foreach ($cf in $cfolders) {
+      $cfull = Join-Path $ModsDir $cf
+      if (Test-Path $cfull) { $cdirs += (Get-Item $cfull) }
+    }
+    if ($cdirs.Count -le 1) { continue }
+    $cName = $cid
+    $cfm = @($Mods | Where-Object { [string]$_.WorkshopId -eq $cid })[0]
+    if ($cfm) { $cName = [string]$cfm.Name }
+    $candidates += [PSCustomObject]@{ Name = $cName; WorkshopId = $cid; VariantCount = $cdirs.Count }
+  }
+  if ($candidates.Count -eq 0) { Set-GuiTransientStatus ('No installed mods have multiple variants to manage.'); return }
+  $pick = Show-GuiWpfPicker 'Manage Variants' 'Select the mod(s) whose variants you want to revise.' $candidates @(
+    @{ Header = 'Name'; Property = 'Name'; Width = 500 },
+    @{ Header = 'Variants'; Property = 'VariantCount'; Width = 100 },
+    @{ Header = 'Workshop ID'; Property = 'WorkshopId'; Width = 150 }
+  ) 'Manage Selected'
+  if ($pick.Failed -or $pick.CancelAll) { return }
+  $ids = @($pick.Selected | ForEach-Object { [string]$_.WorkshopId })
+  if ($ids.Count -eq 0) { return }
   $considered = 0; $changedMods = 0; $removedFolders = 0; $mapDirty = $false
   $pendingManage = @()
   foreach ($id in $ids) {
     $prop = $map.PSObject.Properties[[string]$id]
-    if (-not $prop -or $prop.Value.installed -ne $true -or -not $prop.Value.folders) { continue }
+    if (-not $prop) { continue }
     $folders = @($prop.Value.folders | ForEach-Object { [string]$_ })
-    if ($folders.Count -le 1) { continue }
     $dirs = @()
     foreach ($f in $folders) {
       $full = Join-Path $ModsDir $f
@@ -5486,7 +5503,9 @@ function Manage-GuiModVariants {
     }
     if ($dirs.Count -le 1) { continue }
     $considered++
-    $modName = [string]$script:GuiSelectedMods[[string]$id]
+    $modName = [string]$id
+    $fm2 = @($Mods | Where-Object { [string]$_.WorkshopId -eq [string]$id })[0]
+    if ($fm2) { $modName = [string]$fm2.Name }
     $storedV = $null
     if ($prop.Value.PSObject.Properties['variants']) { $storedV = @($prop.Value.variants | ForEach-Object { [string]$_ }) }
     $selRes = Select-KeptVariants $dirs $storedV $modName -DeferPicker -ForcePicker
@@ -5526,7 +5545,7 @@ function Manage-GuiModVariants {
   }
   if ($mapDirty) { Save-InstallMap $map; Clear-DiskModIdMap }
   if ($script:AbortVariantBatch) { Set-GuiTransientStatus ('Variants cancelled.'); return }
-  if ($considered -eq 0) { Set-GuiTransientStatus ('No multi-version mods selected.'); return }
+  if ($considered -eq 0) { Set-GuiTransientStatus ('No multi-variant mods to manage.'); return }
   if ($changedMods -eq 0) { Set-GuiTransientStatus ('Variants: no changes - kept all selected variants.'); return }
   Set-GuiTransientStatus ('Variants: removed ' + $removedFolders + ' variant folder(s) across ' + $changedMods + ' mod(s).')
   # Standard: refresh every view after folders change.
