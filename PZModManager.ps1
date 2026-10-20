@@ -1,7 +1,7 @@
 # PZ Mod Manager - Created by duy64. Licensed under the MIT License (see LICENSE.txt).
 #Requires -Version 5.1
 <#
-  PZ Mod Manager v436 - B42 Essentials: mod pack for Single-Player & Multiplayer
+  PZ Mod Manager v437 - B42 Essentials: mod pack for Single-Player & Multiplayer
   Full collection (~190 mods) + Cheat Menu: Rebuild, no Steam client needed.
 #>
 $ErrorActionPreference = 'Stop'
@@ -17,7 +17,7 @@ $NL          = [Environment]::NewLine
 # Target game build. B43 = change these lines; the layout repair and [10] checks derive from them.
 $GameBuild = '42'      # major build: version folder name (42/)
 $GameBuildFull = '42.21'  # current full build: versionMax floor for [10] warnings
-$ScriptVersion = '436'    # app version: shown in the menu header + GUI title
+$ScriptVersion = '437'    # app version: shown in the menu header + GUI title
 
 # All known categories, including ones with zero mods right now (Maps /
 # Audio / Zombies have no catalog mods yet). The category editor lists
@@ -5786,6 +5786,28 @@ function Test-VariantFamily($dirs) {
   return $false
 }
 
+function Reset-AllVariantChoices {
+  # Clear every stored variant choice (installed folders are not
+  # touched). Choices will be asked again on the next install,
+  # update, or Manage Variants. Reachable from the Manage Variants
+  # dialog button AND from the Tools menu - the menu entry matters
+  # because the dialog does not open when no mod needs a choice,
+  # which is exactly when a reset is wanted.
+  $yn = Show-GuiMessageBox 'Reset all variant choices? Every stored version choice will be cleared. Installed folders are not touched, and choices will be asked again on the next install, update, or Manage Variants.' 'Reset All Variant Choices' ([System.Windows.MessageBoxButton]::YesNo) ([System.Windows.MessageBoxImage]::Question)
+  if ($yn -ne [System.Windows.MessageBoxResult]::Yes) { Set-GuiTransientStatus ('Reset cancelled.'); return }
+  $mapR = Get-InstallMap
+  $resetCount = 0
+  if ($mapR) {
+    foreach ($rp in @($mapR.PSObject.Properties)) {
+      if ([string]$rp.Name -notmatch '^\d+$') { continue }
+      if ($rp.Value.PSObject.Properties['variants']) { $rp.Value.PSObject.Properties.Remove('variants'); $resetCount++ }
+    }
+    if ($resetCount -gt 0) { Save-InstallMap $mapR }
+  }
+  if ($resetCount -eq 0) { Set-GuiTransientStatus ('No stored variant choices to reset.') }
+  else { Set-GuiTransientStatus ('Variant choices reset for ' + $resetCount + ' mod(s) - choices will be asked again.') }
+}
+
 function Manage-GuiModVariants {
   $script:AbortVariantBatch = $false
   # Manage variants: lists EVERY installed mod with multiple variant
@@ -5838,31 +5860,18 @@ function Manage-GuiModVariants {
     if ($cfm) { $cName = [string]$cfm.Name }
     $candidates += [PSCustomObject]@{ Name = $cName; WorkshopId = $cid; VariantCount = $cdirs.Count }
   }
-  if ($candidates.Count -eq 0) { Set-GuiTransientStatus ('No installed mods have multiple variants to manage.'); return }
+  if ($candidates.Count -eq 0) {
+    $anyChoice = $false
+    foreach ($prop in @($map.PSObject.Properties)) { if ($prop.Value.PSObject.Properties['variants']) { $anyChoice = $true; break } }
+    if ($anyChoice) { Set-GuiTransientStatus ('No mods need a version choice. To choose again, use Tools > Reset All Variant Choices.'); return }
+    Set-GuiTransientStatus ('No installed mods have multiple variants to manage.'); return
+  }
   $pick = Show-GuiWpfPicker 'Manage Variants' 'Select the mod(s) to choose versions for. A mod leaves this list once its choice is saved; Reset All Variant Choices makes every mod ask again.' $candidates @(
     @{ Header = 'Name'; Property = 'Name'; Width = 500 },
     @{ Header = 'Variants'; Property = 'VariantCount'; Width = 100 },
     @{ Header = 'Workshop ID'; Property = 'WorkshopId'; Width = 150 }
   ) 'Manage Selected' -ExtraButtonText 'Reset All Variant Choices'
-  if ($pick.ExtraClicked) {
-    # Reset all: clear every stored variant choice (folders on disk
-    # are not touched). Choices will be asked again on the next
-    # install, update, or Manage Variants.
-    $yn = Show-GuiMessageBox 'Reset all variant choices? Every stored version choice will be cleared. Installed folders are not touched, and choices will be asked again on the next install, update, or Manage Variants.' 'Reset All Variant Choices' ([System.Windows.MessageBoxButton]::YesNo) ([System.Windows.MessageBoxImage]::Question)
-    if ($yn -ne [System.Windows.MessageBoxResult]::Yes) { Set-GuiTransientStatus ('Reset cancelled.'); return }
-    $mapR = Get-InstallMap
-    $resetCount = 0
-    if ($mapR) {
-      foreach ($rp in @($mapR.PSObject.Properties)) {
-        if ([string]$rp.Name -notmatch '^\d+$') { continue }
-        if ($rp.Value.PSObject.Properties['variants']) { $rp.Value.PSObject.Properties.Remove('variants'); $resetCount++ }
-      }
-      if ($resetCount -gt 0) { Save-InstallMap $mapR }
-    }
-    if ($resetCount -eq 0) { Set-GuiTransientStatus ('No stored variant choices to reset.') }
-    else { Set-GuiTransientStatus ('Variant choices reset for ' + $resetCount + ' mod(s) - choices will be asked again.') }
-    return
-  }
+  if ($pick.ExtraClicked) { Reset-AllVariantChoices; return }
   if ($pick.Failed -or $pick.CancelAll) { return }
   $ids = @($pick.Selected | ForEach-Object { [string]$_.WorkshopId })
   if ($ids.Count -eq 0) { return }
@@ -6711,6 +6720,7 @@ function Show-Gui {
         <MenuItem x:Name="MenuUpdateAll" Header="Check For Mod Updates"/>
         <MenuItem x:Name="MenuCompatReport" Header="Compatibility Report"/>
         <MenuItem x:Name="MenuVariants" Header="Manage Variants"/>
+        <MenuItem x:Name="MenuResetVariants" Header="Reset All Variant Choices"/>
         <MenuItem x:Name="MenuAddInstalled" Header="Add Existing Mods"/>
         <MenuItem x:Name="MenuWorkshop" Header="View Mod's Page"/>
         <MenuItem x:Name="MenuBrowseWorkshop" Header="Workshop Home Page"/>
@@ -6976,6 +6986,7 @@ function Show-Gui {
     $script:GuiClearCacheButton = $script:GuiWindow.FindName('MenuClearCache')  # Tools menu item
     $script:GuiCompatReportButton = $script:GuiWindow.FindName('MenuCompatReport')  # Tools menu item
     $script:GuiVariantsButton = $script:GuiWindow.FindName('MenuVariants')  # Tools menu item
+    $script:GuiResetVariantsButton = $script:GuiWindow.FindName('MenuResetVariants')  # Tools menu item
     $script:GuiWorkshopButton = $script:GuiWindow.FindName('MenuWorkshop')  # Tools menu item
     $script:GuiBrowseWorkshopButton = $script:GuiWindow.FindName('MenuBrowseWorkshop')  # Tools menu item
     $script:GuiModAddIdBox = $script:GuiWindow.FindName('ModAddIdBox')
@@ -7055,6 +7066,7 @@ function Show-Gui {
     $script:GuiWindow.FindName('MenuAbout').Add_Click({ Show-GuiAboutDialog })
     $script:GuiCompatReportButton.Add_Click({ Show-GuiCompatibilityReportDialog })
     $script:GuiVariantsButton.Add_Click({ Manage-GuiModVariants })
+    $script:GuiResetVariantsButton.Add_Click({ Reset-AllVariantChoices })
     $script:GuiWorkshopButton.Add_Click({ Open-GuiWorkshopPage })
     $script:GuiBrowseWorkshopButton.Add_Click({ Start-Process 'https://steamcommunity.com/app/108600/workshop/' })
     $script:GuiModAddButton.Add_Click({ $typed = [string]$script:GuiModAddIdBox.Text; if ($typed.Trim() -ne '') { $entries = @(Parse-ModIdsFromText $typed); if ($entries.Count -gt 0) { $valid = @($entries | Where-Object { [bool]$_.Valid }); $rejected = @($entries | Where-Object { -not [bool]$_.Valid }); if ($valid.Count -gt 0) { Add-GuiListMembers (Get-ActiveListSafe) $valid }; if ($rejected.Count -gt 0) { Show-GuiRejectedWorkshopIds $rejected }; $script:GuiModAddIdBox.Text = '' } else { Set-GuiTransientStatus ('No valid Workshop ID found.') } } else { Set-GuiTransientStatus ('Enter an ID/URL.') } })
