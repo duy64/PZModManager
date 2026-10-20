@@ -1,7 +1,7 @@
 # PZ Mod Manager - Created by duy64. Licensed under the MIT License (see LICENSE.txt).
 #Requires -Version 5.1
 <#
-  PZ Mod Manager v405 - B42 Essentials: mod pack for Single-Player & Multiplayer
+  PZ Mod Manager v406 - B42 Essentials: mod pack for Single-Player & Multiplayer
   Full collection (~190 mods) + Cheat Menu: Rebuild, no Steam client needed.
 #>
 $ErrorActionPreference = 'Stop'
@@ -17,7 +17,7 @@ $NL          = [Environment]::NewLine
 # Target game build. B43 = change these lines; the layout repair and [10] checks derive from them.
 $GameBuild = '42'      # major build: version folder name (42/)
 $GameBuildFull = '42.21'  # current full build: versionMax floor for [10] warnings
-$ScriptVersion = '405'    # app version: shown in the menu header + GUI title
+$ScriptVersion = '406'    # app version: shown in the menu header + GUI title
 
 # All known categories, including ones with zero mods right now (Maps /
 # Audio / Zombies have no catalog mods yet). The category editor lists
@@ -659,13 +659,102 @@ function Save-WorkshopNames {
   } catch { }
 }
 
+$WorkshopRatingsFile = Join-Path $PSScriptRoot 'workshop-ratings.json'
+function Format-Stars([int]$stars) {
+  # 1-5 star display. 0 or negative = no rating data, show blank.
+  if ($stars -le 0) { return '' }
+  if ($stars -gt 5) { $stars = 5 }
+  $filled = [char]0x2605; $empty = [char]0x2606
+  return (([string]$filled * $stars) + ([string]$empty * (5 - $stars)))
+}
+function Get-WorkshopItemStars([string]$id) {
+  # Scrape the star rating from the mod's Workshop page. Steam's API
+  # does not expose ratings; the page HTML has e.g. 5-star_large.png.
+  # Returns 0-5, or 0 on failure / no rating.
+  try {
+    $r = Invoke-WebRequest -Uri ('https://steamcommunity.com/sharedfiles/filedetails/?id=' + $id) -UseBasicParsing -TimeoutSec 10 -ErrorAction Stop
+    $m = [regex]::Match([string]$r.Content, '(\d)-star_large\.png')
+    if ($m.Success) { $n = 0; if ([int]::TryParse($m.Groups[1].Value, [ref]$n) -and $n -ge 1 -and $n -le 5) { return $n } }
+  } catch { }
+  return 0
+}
+function Load-WorkshopRatings {
+  # Returns @{ Ratings = hashtable(Wid->stars); Fetched = date-string }.
+  $res = @{ Ratings = @{}; Fetched = '' }
+  if (Test-Path $WorkshopRatingsFile) {
+    try {
+      $d = Get-Content $WorkshopRatingsFile -Raw -ErrorAction Stop | ConvertFrom-Json
+      $res.Fetched = [string]$d.fetched
+      foreach ($p in $d.ratings.PSObject.Properties) { $res.Ratings[[string]$p.Name] = [int]$p.Value }
+    } catch { }
+  }
+  return $res
+}
+function Save-WorkshopRatings($ratings) {
+  try {
+    $obj = New-Object PSObject
+    $obj | Add-Member -NotePropertyName 'fetched' -NotePropertyValue (Get-Date -Format 'yyyy-MM-dd')
+    $st = New-Object PSObject
+    foreach ($k in @($ratings.Keys | Sort-Object)) { $st | Add-Member -NotePropertyName $k -NotePropertyValue ([int]$ratings[$k]) }
+    $obj | Add-Member -NotePropertyName 'ratings' -NotePropertyValue $st
+    ($obj | ConvertTo-Json -Depth 3) | Set-Content $WorkshopRatingsFile -Encoding UTF8 -Force
+  } catch { }
+}
+function Start-WorkshopRatingsFetch($ids) {
+  # Background scrape of star ratings (does NOT block the UI). Writes
+  # workshop-ratings.json when done; the next list refresh picks it up.
+  # Skips IDs already cached and fresh (7-day TTL).
+  $cached = Load-WorkshopRatings
+  $stale = $true
+  if ($cached.Fetched -ne '') {
+    try { if (((Get-Date) - [datetime]::ParseExact($cached.Fetched, 'yyyy-MM-dd', $null)).Days -le 7) { $stale = $false } } catch { }
+  }
+  $need = @()
+  foreach ($id in @($ids)) { $s = [string]$id; if ($stale -or -not $cached.Ratings.ContainsKey($s)) { $need += $s } }
+  if ($need.Count -eq 0) { return }
+  # Merge existing fresh entries so the background job keeps them.
+  $existing = @{}
+  if (-not $stale) { foreach ($k in @($cached.Ratings.Keys)) { $existing[[string]$k] = [int]$cached.Ratings[$k] } }
+  try {
+    $rs = [runspacefactory]::CreateRunspace()
+    $rs.Open()
+    $ps = [powershell]::Create()
+    $ps.Runspace = $rs
+    $scriptBlock = {
+      param($needIds, $cacheFile, $existingRatings)
+      $ratings = @{}
+      foreach ($k in @($existingRatings.Keys)) { $ratings[[string]$k] = [int]$existingRatings[$k] }
+      foreach ($wid in $needIds) {
+        $stars = 0
+        try {
+          $r = Invoke-WebRequest -Uri ('https://steamcommunity.com/sharedfiles/filedetails/?id=' + $wid) -UseBasicParsing -TimeoutSec 10 -ErrorAction Stop
+          $m = [regex]::Match([string]$r.Content, '(\d)-star_large\.png')
+          if ($m.Success) { $n = 0; if ([int]::TryParse($m.Groups[1].Value, [ref]$n) -and $n -ge 1 -and $n -le 5) { $stars = $n } }
+        } catch { }
+        $ratings[[string]$wid] = $stars
+        Start-Sleep -Milliseconds 300
+      }
+      try {
+        Add-Type -AssemblyName System.Web.Extensions -ErrorAction SilentlyContinue
+        $ser = New-Object System.Web.Script.Serialization.JavaScriptSerializer
+        $json = $ser.Serialize(@{ fetched = (Get-Date -Format 'yyyy-MM-dd'); ratings = $ratings })
+        [System.IO.File]::WriteAllText($cacheFile, $json, [System.Text.Encoding]::UTF8)
+      } catch { }
+    }
+    [void]$ps.AddScript($scriptBlock).AddParameters(@{ needIds = $need; cacheFile = $WorkshopRatingsFile; existingRatings = $existing })
+    $handle = $ps.BeginInvoke()
+    $script:RatingsFetchJob = @{ PS = $ps; Handle = $handle; Runspace = $rs }
+  } catch { }
+}
+
 function Get-WorkshopStats($ids) {
   # Subscribers + ratings per Workshop ID. File cache workshop-stats.json
   # (7-day TTL) + in-memory cache per session. Missing/stale entries are
   # fetched via GetPublishedFileDetails (batched, 100 per call).
   # Offline/API failure -> use cache or zeros.
-  # Returns a hashtable WorkshopId -> PSCustomObject(Subscribers, Score,
-  # VotesUp, VotesDown). Score is 0-1 (fraction positive).
+  # Returns a hashtable WorkshopId -> PSCustomObject(Subscribers, Stars).
+  # Stars is 0-5 from the workshop page scrape (0 = no data yet). Ratings
+  # live in workshop-ratings.json (own 7-day TTL), fetched in background.
   if ($script:WorkshopStats -eq $null) {
     $script:WorkshopStats = @{}
     $script:WorkshopStatsFetched = ''
@@ -3714,9 +3803,8 @@ function Sort-GuiMods($list, $installed, $packNamesMap) {
     if ($desc) { return @($list | Sort-Object $key, Name -Descending) } else { return @($list | Sort-Object $key, Name) }
   }
   if ($col -eq 'Rating') {
-    # Sort by raw Score (0-1) from the stats cache.
     $stats = Get-WorkshopStats
-    $key = { $v = [double]0; if ($stats -and $stats.ContainsKey([string]$_.WorkshopId)) { try { $v = [double]$stats[[string]$_.WorkshopId].Score } catch { } }; $v }
+    $key = { $v = [int]0; if ($stats -and $stats.ContainsKey([string]$_.WorkshopId)) { try { $v = [int]$stats[[string]$_.WorkshopId].Stars } catch { } }; $v }
     if ($desc) { return @($list | Sort-Object $key, Name -Descending) } else { return @($list | Sort-Object $key, Name) }
   }
   if ($col -eq 'Packs') {
@@ -4026,7 +4114,7 @@ function Refresh-GuiMods {
       Status = $status
       WorkshopId = [string]$m.WorkshopId
       Subscribers = $(if ($stats -and $stats.ContainsKey([string]$m.WorkshopId)) { [long]$stats[[string]$m.WorkshopId].Subscribers } else { [long]0 })
-      Rating = $(if ($stats -and $stats.ContainsKey([string]$m.WorkshopId)) { [string]([math]::Round([double]$stats[[string]$m.WorkshopId].Score * 100)) + '%' } else { '' })
+      Rating = $(if ($stats -and $stats.ContainsKey([string]$m.WorkshopId)) { Format-Stars ([int]$stats[[string]$m.WorkshopId].Stars) } else { '' })
       Date = $dateVal
       Packs = $packNames
       IsChecked = $script:GuiSelectedMods.ContainsKey([string]$m.WorkshopId)
@@ -4378,13 +4466,12 @@ function Refresh-GuiPacks {
     # Header sort indicators.
     if ($script:GuiPackList.View -and $script:GuiPackList.View.Columns) {
       $gvCols = $script:GuiPackList.View.Columns
-      $plain = @('Name', 'Mods', 'Created Date', 'Installed', 'Description')
-      for ($i = 0; $i -lt 5 -and ($i + 1) -lt $gvCols.Count; $i++) { $gvCols[$i + 1].Header = $plain[$i] }
+      $plain = @('Name', 'Mods', 'Installed', 'Description')
+      for ($i = 0; $i -lt 4 -and ($i + 1) -lt $gvCols.Count; $i++) { $gvCols[$i + 1].Header = $plain[$i] }
       if ($col -eq 'Name') { $gvCols[1].Header = if ($script:GuiPacksSortDescending) { 'Name (Z-A)' } else { 'Name (A-Z)' } }
       elseif ($col -eq 'Mods') { $gvCols[2].Header = if ($script:GuiPacksSortDescending) { 'Mods (9-0)' } else { 'Mods (0-9)' } }
-      elseif ($col -eq 'Date') { $gvCols[3].Header = if ($script:GuiPacksSortDescending) { 'Created Date (newest)' } else { 'Created Date (oldest)' } }
-      elseif ($col -eq 'Installed') { $gvCols[4].Header = if ($script:GuiPacksSortDescending) { 'Installed (9-0)' } else { 'Installed (0-9)' } }
-      elseif ($col -eq 'Description') { $gvCols[5].Header = if ($script:GuiPacksSortDescending) { 'Description (Z-A)' } else { 'Description (A-Z)' } }
+      elseif ($col -eq 'Installed') { $gvCols[3].Header = if ($script:GuiPacksSortDescending) { 'Installed (9-0)' } else { 'Installed (0-9)' } }
+      elseif ($col -eq 'Description') { $gvCols[4].Header = if ($script:GuiPacksSortDescending) { 'Description (Z-A)' } else { 'Description (A-Z)' } }
     }
     # Detail pane: members of the detail pack (first shown pack by default,
     # or the pack the user clicked). The detail pack survives refreshes.
@@ -4426,7 +4513,7 @@ function Refresh-GuiPackDetail($pack) {
     $isInstalled = $installed -contains [string]$m.WorkshopId
     $pwid = [string]$m.WorkshopId
     $psubs = [long]0; $prate = ''
-    if ($pStats -and $pStats.ContainsKey($pwid)) { $psubs = [long]$pStats[$pwid].Subscribers; $prate = [string]([math]::Round([double]$pStats[$pwid].Score * 100)) + '%' }
+    if ($pStats -and $pStats.ContainsKey($pwid)) { $psubs = [long]$pStats[$pwid].Subscribers; $prate = Format-Stars ([int]$pStats[$pwid].Stars) }
     $items += [PSCustomObject]@{
       Name = [string]$m.Name
       Category = [string]$m.Cat
@@ -5170,11 +5257,12 @@ function Show-GuiWorkshopSearch {
         else { $window.FindName('SearchInstruction').Text = ('No results for "' + $q.Trim() + '".') }
         $state.Rows = @()
       } else {
+        Start-WorkshopRatingsFetch @($found | ForEach-Object { [string]$_.WorkshopId })
         $sStats = Get-WorkshopStats @($found | ForEach-Object { [string]$_.WorkshopId })
         $state.Rows = @($found | ForEach-Object {
           $swid = [string]$_.WorkshopId
           $ssubs = [long]0; $srate = ''
-          if ($sStats -and $sStats.ContainsKey($swid)) { $ssubs = [long]$sStats[$swid].Subscribers; $srate = [string]([math]::Round([double]$sStats[$swid].Score * 100)) + '%' }
+          if ($sStats -and $sStats.ContainsKey($swid)) { $ssubs = [long]$sStats[$swid].Subscribers; $srate = Format-Stars ([int]$sStats[$swid].Stars) }
           [PSCustomObject]@{ IsChecked = $true; Name = [string]$_.Name; Subscribers = $ssubs; Rating = $srate; WorkshopId = $swid }
         })
         $window.FindName('SearchInstruction').Text = ('Found ' + $found.Count.ToString() + ' result(s) - tick the mods to add.')
@@ -5190,11 +5278,12 @@ function Show-GuiWorkshopSearch {
         else { $window.FindName('SearchInstruction').Text = 'No popular mods found.' }
         $state.Rows = @()
       } else {
+        Start-WorkshopRatingsFetch @($found | ForEach-Object { [string]$_.WorkshopId })
         $sStats = Get-WorkshopStats @($found | ForEach-Object { [string]$_.WorkshopId })
         $state.Rows = @($found | ForEach-Object {
           $swid = [string]$_.WorkshopId
           $ssubs = [long]0; $srate = ''
-          if ($sStats -and $sStats.ContainsKey($swid)) { $ssubs = [long]$sStats[$swid].Subscribers; $srate = [string]([math]::Round([double]$sStats[$swid].Score * 100)) + '%' }
+          if ($sStats -and $sStats.ContainsKey($swid)) { $ssubs = [long]$sStats[$swid].Subscribers; $srate = Format-Stars ([int]$sStats[$swid].Stars) }
           [PSCustomObject]@{ IsChecked = $true; Name = [string]$_.Name; Subscribers = $ssubs; Rating = $srate; WorkshopId = $swid }
         })
         $window.FindName('SearchInstruction').Text = ('Found ' + $found.Count.ToString() + ' popular mod(s) - tick the mods to add. (Ranked by relevance, not subscriptions.)')
@@ -6380,7 +6469,7 @@ function Show-Gui {
                 <GridViewColumn Header="Status" Width="150" DisplayMemberBinding="{Binding Status}"/>
                 <GridViewColumn Header="Workshop ID" Width="150" DisplayMemberBinding="{Binding WorkshopId}"/>
                 <GridViewColumn Header="Subscribers" Width="140" DisplayMemberBinding="{Binding Subscribers, StringFormat='{}{0:N0}'}"/>
-                <GridViewColumn Header="Rating" Width="80" DisplayMemberBinding="{Binding Rating}"/>
+                <GridViewColumn Header="Rating" Width="100" DisplayMemberBinding="{Binding Rating}"/>
                 <GridViewColumn Header="Installed Date" Width="180" DisplayMemberBinding="{Binding Date}"/>
                 <GridViewColumn HeaderContainerStyle="{StaticResource NoGripperHeader}" Header="Packs" Width="200" DisplayMemberBinding="{Binding Packs}"/>
               </GridView>
@@ -6424,7 +6513,6 @@ function Show-Gui {
                 </GridViewColumn>
                 <GridViewColumn Header="Name" Width="280" DisplayMemberBinding="{Binding Name}"/>
                 <GridViewColumn Header="Mods" Width="120" DisplayMemberBinding="{Binding Mods}"/>
-                <GridViewColumn Header="Created Date" Width="180" DisplayMemberBinding="{Binding Date}"/>
                 <GridViewColumn Header="Installed" Width="110" DisplayMemberBinding="{Binding Installed}"/>
                 <GridViewColumn HeaderContainerStyle="{StaticResource NoGripperHeader}" Header="Description" Width="200" DisplayMemberBinding="{Binding Description}"/>
               </GridView>
@@ -6457,7 +6545,7 @@ function Show-Gui {
                 <GridViewColumn Header="Category" Width="150" DisplayMemberBinding="{Binding Category}"/>
                 <GridViewColumn Header="Status" Width="150" DisplayMemberBinding="{Binding Status}"/>
                 <GridViewColumn Header="Subscribers" Width="120" DisplayMemberBinding="{Binding Subscribers, StringFormat='{}{0:N0}'}"/>
-                <GridViewColumn Header="Rating" Width="80" DisplayMemberBinding="{Binding Rating}"/>
+                <GridViewColumn Header="Rating" Width="100" DisplayMemberBinding="{Binding Rating}"/>
                 <GridViewColumn HeaderContainerStyle="{StaticResource NoGripperHeader}" Header="Workshop ID" Width="150" DisplayMemberBinding="{Binding WorkshopId}"/>
               </GridView>
             </ListView.View>
@@ -6716,9 +6804,8 @@ function Show-Gui {
           $sortCol = $null
           if ($idx -eq 1) { $sortCol = 'Name' }
           elseif ($idx -eq 2) { $sortCol = 'Mods' }
-          elseif ($idx -eq 3) { $sortCol = 'Date' }
-          elseif ($idx -eq 4) { $sortCol = 'Installed' }
-          elseif ($idx -eq 5) { $sortCol = 'Description' }
+          elseif ($idx -eq 3) { $sortCol = 'Installed' }
+          elseif ($idx -eq 4) { $sortCol = 'Description' }
           if ($sortCol) { Cycle-GuiPacksSort $sortCol }
         }
       }
@@ -6931,6 +7018,9 @@ function Show-Gui {
     Update-GuiListSelectionButtons
     Update-GuiWorkshopButtons
     $script:GuiWindow.Title = 'PZ Mod Manager v' + $ScriptVersion + ' - Project Zomboid B' + $GameBuildFull
+    # Star ratings: scrape missing/stale entries in the background
+    # (Steam API does not expose them). Next refresh picks them up.
+    Start-WorkshopRatingsFetch @($Mods | ForEach-Object { [string]$_.WorkshopId })
     Set-GuiWindowIcon
     if ($script:StartupAdoptSummary) { Set-GuiTransientStatus $script:StartupAdoptSummary 15 }
     [void]$script:GuiWindow.ShowDialog()

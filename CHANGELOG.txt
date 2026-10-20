@@ -1,6 +1,7 @@
 PZ MOD MANAGER - FULL CHANGELOG
 Created by duy64. Licensed under the MIT License (see LICENSE.txt).
 
+v406: Packs tab: removed the empty Created Date column (built-in packs have no date). Rating is now 1-5 stars (scraped from Workshop pages, cached weekly, fetched in background so the app stays responsive) instead of a percentage. Steam's API does not provide ratings - the 0% in v399-v405 was a wrong assumption, fixed.
 v405: Packs tab: Description is now the last fill column (was fixed-width and truncated). Column order: Name, Mods, Created Date, Installed, Description. Also fixes Created Date not being sortable (was mapped to Installed sort).
 v404: Fixed Mods tab overflow (Rating column pushed total width past the window). Trimmed Name 500->450, Status 200->150. New standard: total fixed column width must leave >=250px for the fill column within the 1650px default window.
 v403: Revised variant system. Manage Variants (Tools menu) now lists all installed multi-variant mods - no pre-selection needed. Consolidated picker buttons renamed for clarity: Apply Selection / Keep All Versions / Abort Batch (was Keep Selected Versions / Cancel / Cancel All).
