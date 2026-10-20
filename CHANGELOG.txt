@@ -1,6 +1,7 @@
 PZ MOD MANAGER - FULL CHANGELOG
 Created by duy64. Licensed under the MIT License (see LICENSE.txt).
 
+v412: Restored the Created Date column on the Packs tab (removed in v406 - built-in packs show blank since they have no stored date; custom packs show theirs).
 v411: Star ratings scrape was rate-limited by Steam (HTTP 429 after ~20 rapid requests; repeated runs kept the block alive, so every scrape failed). Scrape now paces at 2.5s per request, retries once after 60s on failure, and aborts after 10 consecutive failures instead of hammering.
 v410: Fixed star ratings scraping on Windows (TLS 1.2 + browser user-agent; the old scrape silently failed and cached zeros). Old all-zeros cache is discarded and refetched once. First scrape error is now logged to workshop-ratings.debug.txt.
 v409: Star ratings now appear automatically - the app refreshes the list when the background scrape finishes (previously you had to trigger a refresh manually). Also replaced the fragile JSON writer with a dependency-free one and added a debug log.
