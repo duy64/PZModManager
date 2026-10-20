@@ -1,7 +1,7 @@
 # PZ Mod Manager - Created by duy64. Licensed under the MIT License (see LICENSE.txt).
 #Requires -Version 5.1
 <#
-  PZ Mod Manager v393 - B42 Essentials: mod pack for Single-Player & Multiplayer
+  PZ Mod Manager v394 - B42 Essentials: mod pack for Single-Player & Multiplayer
   Full collection (~190 mods) + Cheat Menu: Rebuild, no Steam client needed.
 #>
 $ErrorActionPreference = 'Stop'
@@ -17,7 +17,7 @@ $NL          = [Environment]::NewLine
 # Target game build. B43 = change these lines; the layout repair and [10] checks derive from them.
 $GameBuild = '42'      # major build: version folder name (42/)
 $GameBuildFull = '42.21'  # current full build: versionMax floor for [10] warnings
-$ScriptVersion = '393'    # app version: shown in the menu header + GUI title
+$ScriptVersion = '394'    # app version: shown in the menu header + GUI title
 
 # All known categories, including ones with zero mods right now (Maps /
 # Audio / Zombies have no catalog mods yet). The category editor lists
@@ -3443,6 +3443,7 @@ function Refresh-GuiCategoriesTab {
 
 
   Update-GuiCategorySelectionButtons
+  Sync-GuiHeaderCheckbox $script:GuiCategoryListView 'SelectAllCategories' $script:GuiCategoriesShownNames $script:GuiSelectedCategories
 }
 
 function Refresh-GuiCategoryDetail([string]$cat) {
@@ -3972,6 +3973,7 @@ function Uninstall-GuiSelectedMods {
   $ok = 0
   foreach ($id in $ids) { [void](Remove-WorkshopId $id); $ok++ }
   Set-GuiTransientStatus ('Done: ' + $ok + '/' + $ids.Count + ' selected mods uninstalled.')
+  Clear-GuiSelection
   # Standard: refresh every view after uninstall (one composite call).
   # Orphaned dependencies: auto-added deps no remaining installed mod
   # requires (shared deps are never orphaned). ONE picker, unchecked
@@ -4114,6 +4116,7 @@ function Refresh-GuiMods {
   $script:GuiModsInstalled = $installedCount
   $script:GuiModsListName = $listName
   Update-GuiStatusBar
+  Sync-GuiHeaderCheckbox $script:GuiModList 'SelectAll' $script:GuiModsShownIds $script:GuiSelectedMods
 }
 
 function Initialize-ConsoleHider {
@@ -4446,6 +4449,7 @@ function Refresh-GuiPacks {
     $script:GuiRefreshingPacks = $false
   }
 
+  Sync-GuiHeaderCheckbox $script:GuiPackList 'SelectAllPacks' $script:GuiPacksShownIds $script:GuiSelectedPacks
 }
 
 function Refresh-GuiPackDetail($pack) {
@@ -5265,6 +5269,46 @@ function Remove-GuiSelectedModsFromList {
   Refresh-GuiAfterListChange
 }
 
+function Sync-GuiHeaderCheckbox($listView, $tag, $shownIds, $selected) {
+  # Standard: the header Select-All checkbox must always reflect reality.
+  # Checked only when at least one row is shown AND every shown row is selected.
+  if (-not $listView) { return }
+  try {
+    $queue = New-Object System.Collections.Generic.Queue[System.Windows.DependencyObject]
+    $queue.Enqueue($listView)
+    $cb = $null
+    while ($queue.Count -gt 0 -and -not $cb) {
+      $obj = $queue.Dequeue()
+      if ($obj -is [System.Windows.Controls.CheckBox] -and [string]$obj.Tag -eq $tag) { $cb = $obj; break }
+      if ($obj -is [System.Windows.Media.Visual]) {
+        $n = [System.Windows.Media.VisualTreeHelper]::GetChildrenCount($obj)
+        for ($i = 0; $i -lt $n; $i++) { $queue.Enqueue([System.Windows.Media.VisualTreeHelper]::GetChild($obj, $i)) }
+      }
+    }
+    if ($cb) {
+      $all = $false
+      if ($shownIds -and $shownIds.Count -gt 0 -and $selected) {
+        $all = $true
+        foreach ($k in @($shownIds.Keys)) { if (-not $selected.ContainsKey($k)) { $all = $false; break } }
+      }
+      $cb.IsChecked = $all
+    }
+  } catch { }
+}
+
+function Clear-GuiSelection {
+  # Standard: every tab's checkbox selection resets whenever any visible list
+  # changes (any filter/search) or after a bulk action (install/uninstall).
+  $script:GuiSelectedMods = @{}
+  $script:GuiSelectedPacks = @{}
+  $script:GuiSelectedLists = @{}
+  $script:GuiSelectedCategories = @{}
+  Update-GuiSelectionButtons
+  Update-GuiPackSelectionButtons
+  Update-GuiListSelectionButtons
+  Update-GuiCategorySelectionButtons
+}
+
 function Install-GuiSelectedMods {
   Clear-DiskModIdMap
   $script:AbortVariantBatch = $false
@@ -5273,7 +5317,7 @@ function Install-GuiSelectedMods {
   $script:BatchPreCheckDecisions = $true
   $script:PendingPreCheckFailures = @()
   # Install every checked mod in the Mods tab (Install selected). Selection
-  # survives refreshes/filter changes (kept in $script:GuiSelectedMods).
+  # is cleared after install and on filter changes (see Clear-GuiSelection).
   # Mods already installed are skipped by Install-Mod ('make sure it is there').
   # Two-phase variant handling: the first pass installs single-variant
   # mods and DEFERS multi-variant mods (their decisions are collected,
@@ -5345,6 +5389,7 @@ function Install-GuiSelectedMods {
     }
   }
   if ($script:AbortVariantBatch) { Set-GuiTransientStatus ('Installation cancelled.') } else { Set-GuiTransientStatus ('Done: ' + $ok + '/' + $ids.Count + ' selected mods installed.') }
+  Clear-GuiSelection
   # Standard: refresh every view after install (one composite call).
   Refresh-GuiAfterListChange
   } finally { Set-GuiBusy $false; $script:BatchVariantDecisions = $false; $script:BatchPreCheckDecisions = $false }
@@ -6038,6 +6083,7 @@ function Refresh-GuiNamedLists {
   $script:GuiListsTotal = @(Get-NamedLists).Count
   Update-GuiListSelectionButtons
   Update-GuiStatusBar
+  Sync-GuiHeaderCheckbox $script:GuiNamedListView 'SelectAllLists' $script:GuiListsShownIds $script:GuiSelectedLists
 }
 
 function Set-GuiWindowIcon {
@@ -6595,14 +6641,14 @@ function Show-Gui {
     Refresh-GuiNamedLists
     Refresh-GuiCategoriesTab
 
-    $script:GuiSearchBox.Add_TextChanged({ Refresh-GuiMods })
+    $script:GuiSearchBox.Add_TextChanged({ Clear-GuiSelection; Refresh-GuiMods })
     $script:GuiCategoryBox.Add_SelectionChanged({
       $script:GuiCategory = $script:GuiCategoryBox.SelectedItem
-      Refresh-GuiMods
+      Clear-GuiSelection; Refresh-GuiMods
     })
     $script:GuiPackFilterBox.Add_SelectionChanged({
       $script:GuiPackFilter = $script:GuiPackFilterBox.SelectedItem
-      Refresh-GuiMods
+      Clear-GuiSelection; Refresh-GuiMods
     })
     $script:GuiUpdateAllButton.Add_Click({
       Set-GuiBusy $true
@@ -6864,9 +6910,9 @@ function Show-Gui {
     $script:GuiNewListButton.Add_Click({ New-GuiNamedList })
     $script:GuiImportListButton.Add_Click({ Import-GuiList })
     $script:GuiExportSelectedListButton.Add_Click({ Export-GuiList })
-    $script:GuiPackSearchBox.Add_TextChanged({ $script:GuiPackSearch = $script:GuiPackSearchBox.Text; Refresh-GuiPacks })
-    $script:GuiListSearchBox.Add_TextChanged({ $script:GuiListSearch = $script:GuiListSearchBox.Text; Refresh-GuiNamedLists })
-    $script:GuiCategorySearchBox.Add_TextChanged({ $script:GuiCategorySearch = $script:GuiCategorySearchBox.Text; Refresh-GuiCategoriesTab })
+    $script:GuiPackSearchBox.Add_TextChanged({ $script:GuiPackSearch = $script:GuiPackSearchBox.Text; Clear-GuiSelection; Refresh-GuiPacks })
+    $script:GuiListSearchBox.Add_TextChanged({ $script:GuiListSearch = $script:GuiListSearchBox.Text; Clear-GuiSelection; Refresh-GuiNamedLists })
+    $script:GuiCategorySearchBox.Add_TextChanged({ $script:GuiCategorySearch = $script:GuiCategorySearchBox.Text; Clear-GuiSelection; Refresh-GuiCategoriesTab })
     $script:GuiTabControl.Add_SelectionChanged({
       if ($script:GuiSelectionDirty) {
         $script:GuiSelectionDirty = $false
