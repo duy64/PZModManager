@@ -1,7 +1,7 @@
 # PZ Mod Manager - Created by duy64. Licensed under the MIT License (see LICENSE.txt).
 #Requires -Version 5.1
 <#
-  PZ Mod Manager v432 - B42 Essentials: mod pack for Single-Player & Multiplayer
+  PZ Mod Manager v433 - B42 Essentials: mod pack for Single-Player & Multiplayer
   Full collection (~190 mods) + Cheat Menu: Rebuild, no Steam client needed.
 #>
 $ErrorActionPreference = 'Stop'
@@ -17,7 +17,7 @@ $NL          = [Environment]::NewLine
 # Target game build. B43 = change these lines; the layout repair and [10] checks derive from them.
 $GameBuild = '42'      # major build: version folder name (42/)
 $GameBuildFull = '42.21'  # current full build: versionMax floor for [10] warnings
-$ScriptVersion = '432'    # app version: shown in the menu header + GUI title
+$ScriptVersion = '433'    # app version: shown in the menu header + GUI title
 
 # All known categories, including ones with zero mods right now (Maps /
 # Audio / Zombies have no catalog mods yet). The category editor lists
@@ -1195,6 +1195,8 @@ function Select-KeptVariants($variantDirs, $storedVariants, [string]$modName, [s
   }
   $carryVariants = $null
   if ($storedVariants) { $carryVariants = @($storedVariants) }
+  $skipReason = ''
+  if ($folders.Count -le 1) { $skipReason = ('only one version matches build ' + $GameBuildFull + ' - nothing to choose') }
   if ($script:GuiMode -and $folders.Count -gt 1) {
     $varCands = @()
     for ($vi = 0; $vi -lt $folders.Count; $vi++) {
@@ -1300,7 +1302,7 @@ function Select-KeptVariants($variantDirs, $storedVariants, [string]$modName, [s
       }
       if ($hasIntraDep) { break }
     }
-    if ($hasIntraDep) { Write-Host ("  Variant picker skipped - variants are dependency-linked (module family, keeping all).") -ForegroundColor DarkGray }
+    if ($hasIntraDep) { Write-Host ("  Variant picker skipped - variants are dependency-linked (module family, keeping all).") -ForegroundColor DarkGray; $skipReason = 'versions are dependency-linked (module family) - kept all' }
     $showPicker = ((-not $storedVariants) -or $hasNewVariant -or $ForcePicker) -and -not $hasIntraDep
     if ($showPicker -and $DeferPicker) {
       # Batch mode: defer the decision (no popup). The caller records
@@ -1343,7 +1345,7 @@ function Select-KeptVariants($variantDirs, $storedVariants, [string]$modName, [s
     $singleId = Get-ModInfoId (Join-Path $folders[0].FullName 'mod.info')
     if ($singleId -ne '') { $carryVariants = @($singleId) }
   }
-  return [PSCustomObject]@{ Folders = $folders; CarryVariants = $carryVariants; DroppedIds = $droppedIds; AbortBatch = $abortBatch; Deferred = $deferred; Candidates = $deferCands; StoredVariants = $storedVariants }
+  return [PSCustomObject]@{ Folders = $folders; CarryVariants = $carryVariants; DroppedIds = $droppedIds; AbortBatch = $abortBatch; Deferred = $deferred; Candidates = $deferCands; StoredVariants = $storedVariants; SkipReason = $skipReason }
 }
 
 function Get-ConDecisions($modRows) {
@@ -5760,6 +5762,7 @@ function Manage-GuiModVariants {
   if ($ids.Count -eq 0) { return }
   $considered = 0; $changedMods = 0; $removedFolders = 0; $mapDirty = $false
   $pendingManage = @()
+  $autoNotes = @()
   foreach ($id in $ids) {
     $prop = $map.PSObject.Properties[[string]$id]
     if (-not $prop) { continue }
@@ -5780,6 +5783,9 @@ function Manage-GuiModVariants {
     if ($selRes.Deferred) {
       $pendingManage += [PSCustomObject]@{ WorkshopId = [string]$id; Name = [string]$modName; VariantDirs = @($selRes.Folders); Candidates = @($selRes.Candidates); StoredVariants = $storedV; Prop = $prop; Folders = $folders; VersionDroppedIds = @($selRes.DroppedIds); Kind = 'Manage' }
     } else {
+      $rsn = [string]$selRes.SkipReason
+      if ($rsn -eq '') { $rsn = 'no choice needed - kept all versions' }
+      $autoNotes += ($modName + ': ' + $rsn)
       $ap = Apply-ManageVariantDecision $prop $folders @($selRes.Folders) $selRes.CarryVariants @($selRes.DroppedIds) $storedV
       if ($ap.Changed) { $changedMods++; $removedFolders += $ap.RemovedFolders; $mapDirty = $true }
     }
@@ -5814,8 +5820,10 @@ function Manage-GuiModVariants {
   if ($mapDirty) { Save-InstallMap $map; Clear-DiskModIdMap }
   if ($script:AbortVariantBatch) { Set-GuiTransientStatus ('Variants cancelled.'); return }
   if ($considered -eq 0) { Set-GuiTransientStatus ('No multi-variant mods to manage.'); return }
-  if ($changedMods -eq 0) { Set-GuiTransientStatus ('Variants: no changes - kept all selected variants.'); return }
-  Set-GuiTransientStatus ('Variants: removed ' + $removedFolders + ' variant folder(s) across ' + $changedMods + ' mod(s).')
+  $suffix = ''
+  if ($autoNotes.Count -gt 0) { $suffix = (' Kept as-is: ' + ($autoNotes -join '; ') + '.') }
+  if ($changedMods -eq 0) { Set-GuiTransientStatus ('Variants: no changes - kept all selected variants.' + $suffix); return }
+  Set-GuiTransientStatus ('Variants: removed ' + $removedFolders + ' variant folder(s) across ' + $changedMods + ' mod(s).' + $suffix)
   # Standard: refresh every view after folders change.
   Refresh-GuiAfterListChange
 }
