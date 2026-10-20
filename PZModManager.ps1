@@ -1,7 +1,7 @@
 # PZ Mod Manager - Created by duy64. Licensed under the MIT License (see LICENSE.txt).
 #Requires -Version 5.1
 <#
-  PZ Mod Manager v396 - B42 Essentials: mod pack for Single-Player & Multiplayer
+  PZ Mod Manager v397 - B42 Essentials: mod pack for Single-Player & Multiplayer
   Full collection (~190 mods) + Cheat Menu: Rebuild, no Steam client needed.
 #>
 $ErrorActionPreference = 'Stop'
@@ -17,13 +17,13 @@ $NL          = [Environment]::NewLine
 # Target game build. B43 = change these lines; the layout repair and [10] checks derive from them.
 $GameBuild = '42'      # major build: version folder name (42/)
 $GameBuildFull = '42.21'  # current full build: versionMax floor for [10] warnings
-$ScriptVersion = '396'    # app version: shown in the menu header + GUI title
+$ScriptVersion = '397'    # app version: shown in the menu header + GUI title
 
 # All known categories, including ones with zero mods right now (Maps /
 # Audio / Zombies have no catalog mods yet). The category editor lists
 # these so a mod can be assigned to an empty category; Install-AllMods
 # uses the same order for its install sequence.
-$script:CategoryOrder = @('Frameworks','Vehicles','Aircrafts','Weapons','NPCs','Stories','Events','Multiplayer Mods','Map Tools','Movement','Inventory','Medical','Crafting','Quality of Life Mods','Maps & Tiles','Clothing & Gear','Content Mods','Graphics','Cheats','Others')
+$script:CategoryOrder = @('Frameworks','Vehicles','Aircrafts','Weapons','NPCs','Stories','Events','Map Tools','Movement','Inventory','Medical','Crafting','Quality of Life Mods','Maps & Tiles','Clothing & Gear','Content Mods','Graphics','Cheats','Others')
 $GameBuildMinor = ([version]$GameBuildFull).Minor
 if ($GameBuildMinor -lt 0) { $GameBuildMinor = 0 }
 
@@ -310,16 +310,7 @@ $Mods = @(
   @{ Name='Extraction Mode'; WorkshopId='3785397275'; Cat='Events' },
   @{ Name='Plane Crash Event (WORKING FOR B42.21) (VIEWPOINT)'; WorkshopId='3773663869'; Cat='Events' },
   @{ Name='Dark Presence'; WorkshopId='3774351457'; Cat='Events' },
-  @{ Name='Sun Is Gone [SP/MP]'; WorkshopId='3787603803'; Cat='Events' },
-
-  # ---------- MULTIPLAYER MODS (B42-verified) ----------
-  @{ Name='Survivor League - Community Edition'; WorkshopId='3784151798'; Cat='Multiplayer Mods' },
-  @{ Name='[B42.21+ MP] Push Vehicle'; WorkshopId='3780639614'; Cat='Multiplayer Mods' },
-  @{ Name='Project Cook [B42]'; WorkshopId='3490188370'; Cat='Multiplayer Mods' },
-  @{ Name='Minimap Style Options'; WorkshopId='3526517370'; Cat='Multiplayer Mods' },
-  @{ Name='Thump with Friends [B42]'; WorkshopId='3504753006'; Cat='Multiplayer Mods' },
-  @{ Name='Immersive Blackouts [B42MP]'; WorkshopId='3607686447'; Cat='Multiplayer Mods' },
-  @{ Name='Where Is My Safehouse [B42]'; WorkshopId='3171815531'; Cat='Multiplayer Mods' }
+  @{ Name='Sun Is Gone [SP/MP]'; WorkshopId='3787603803'; Cat='Events' }
 )
 $script:DefaultBase = @($Mods)
 
@@ -607,10 +598,13 @@ function Get-AllPacks([switch]$AllLists) {
   return $out
 }
 
+$script:RetiredWorkshopIds = @('3784151798','3780639614','3490188370','3526517370','3504753006','3607686447','3171815531')
 function Set-ModsFromNamedList([string]$safe) {
   if (-not (Get-NamedListData $safe)) { return $false }
   $m = @()
   foreach ($e in @(Get-ListDirectMods $safe)) {
+    # Skip retired mods (removed from the catalog entirely).
+    if ($script:RetiredWorkshopIds -contains [string]$e.workshopId) { continue }
     # PSCustomObject, NOT a hashtable: Sort-Object by property name
     # does not resolve hashtable keys in Windows PowerShell 5.1, so
     # the Mods tab sort silently did nothing (rows stayed in list order).
@@ -3581,13 +3575,11 @@ function Get-BuiltinCatPackNames($cat) {
 }
 
 function Move-GuiSelectedMods {
-  # Bulk-move every checked mod to the category in the Move-selected box.
-  # The selection is shared with the Mods tab ($script:GuiSelectedMods),
-  # so mods selected in either tab move together. Clears the selection
-  # after the move; the destination group auto-expands.
-  if (-not $script:GuiSelectedMods -or $script:GuiSelectedMods.Count -eq 0) { Set-GuiTransientStatus ('Select some mods first (here or in the Mods tab).'); return }
+  # Bulk-move every checked mod to the category in the Mods tab Move box.
+  # Clears the selection after the move.
+  if (-not $script:GuiSelectedMods -or $script:GuiSelectedMods.Count -eq 0) { Set-GuiTransientStatus ('Select some mods first.'); return }
   $cat = ''
-  if ($script:GuiMoveSelectedCategoryBox) { $cat = ([string]$script:GuiMoveSelectedCategoryBox.Text).Trim() }
+  if ($script:GuiModMoveCategoryBox) { $cat = ([string]$script:GuiModMoveCategoryBox.Text).Trim() }
   if ($cat -eq '') { Set-GuiTransientStatus ('Pick a category to move the selected mods to.'); return }
   $existing = @($Mods | ForEach-Object { $_.Cat } | Where-Object { $_ } | Sort-Object -Unique | Where-Object { $_ -eq $cat })
   if ($existing) { $cat = $existing[0] }
@@ -6361,6 +6353,8 @@ function Show-Gui {
           <StackPanel Orientation="Horizontal">
             <Button x:Name="InstallSelectedModsButton" Content="Install Selected" Padding="10,4" Margin="0,0,12,0"/>
             <Button x:Name="UninstallSelectedModsButton" Content="Uninstall Selected" Padding="10,4" Margin="0,0,12,0"/>
+            <ComboBox x:Name="ModMoveCategoryBox" IsEditable="True" Width="200" Margin="0,0,6,0" VerticalContentAlignment="Center"/>
+            <Button x:Name="ModMoveToCategoryButton" Content="Move To Category" Padding="10,4" Margin="0,0,12,0"/>
           </StackPanel>
           </ScrollViewer>
           <ListView x:Name="ModList" ScrollViewer.HorizontalScrollBarVisibility="Disabled" Grid.Row="3">
@@ -6467,8 +6461,6 @@ function Show-Gui {
           <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
-            <RowDefinition Height="2*"/>
-            <RowDefinition Height="Auto"/>
             <RowDefinition Height="*"/>
           </Grid.RowDefinitions>
           <ScrollViewer Grid.Row="0" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled" Margin="0,0,0,4">
@@ -6482,7 +6474,7 @@ function Show-Gui {
           <StackPanel Orientation="Horizontal">
             <Button x:Name="AddCategoryButton" Content="Add Category" Padding="10,4" Margin="0,0,12,0"/>
             <Button x:Name="DeleteSelectedCategoriesButton" Content="Delete Selected Categories" Padding="10,4" Margin="0,0,12,0"/>
-            <TextBlock Text="Click a category to see its mods below. Select mods (here or in the Mods tab) for a bulk move." VerticalAlignment="Center" Foreground="Gray"/>
+            <TextBlock Text="Select mods in the Mods tab, then use Move To Category there." VerticalAlignment="Center" Foreground="Gray"/>
           </StackPanel>
           </ScrollViewer>
           <ListView x:Name="CategoryListView" ScrollViewer.HorizontalScrollBarVisibility="Disabled" Grid.Row="2">
@@ -6501,35 +6493,6 @@ function Show-Gui {
                 <GridViewColumn Header="Name" Width="300" DisplayMemberBinding="{Binding Name}"/>
                 <GridViewColumn Header="Mods" Width="100" DisplayMemberBinding="{Binding Mods}"/>
                 <GridViewColumn HeaderContainerStyle="{StaticResource NoGripperHeader}" Header="Installed" Width="100" DisplayMemberBinding="{Binding Installed}"/>
-              </GridView>
-            </ListView.View>
-          </ListView>
-          <ScrollViewer Grid.Row="3" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled" Margin="0,8,0,4">
-          <StackPanel Orientation="Horizontal">
-            <TextBlock x:Name="CategoryMemberLabel" Text="Mods" FontWeight="Bold" VerticalAlignment="Center" Margin="0,0,12,0"/>
-            <TextBlock Text="Move selected to:" VerticalAlignment="Center" Margin="0,0,6,0"/>
-            <ComboBox x:Name="MoveSelectedCategoryBox" IsEditable="True" Width="200" Margin="0,0,12,0"/>
-            <Button x:Name="MoveSelectedButton" Content="Move To Category" Padding="10,4" Margin="0,0,12,0"/>
-            <Button x:Name="RemoveSelectedCategoryMembersButton" Content="Remove Selected From Category" Padding="10,4" Margin="0,0,12,0"/>
-                      </StackPanel>
-          </ScrollViewer>
-          <ListView x:Name="CategoryMemberList" ScrollViewer.HorizontalScrollBarVisibility="Disabled" Grid.Row="4">
-            <ListView.View>
-              <GridView AllowsColumnReorder="False">
-                <GridViewColumn HeaderContainerStyle="{StaticResource NoGripperHeader}" Width="28">
-                  <GridViewColumn.Header>
-                    <CheckBox Tag="SelectAllCategoryMembers" ToolTip="Select all / clear selection" VerticalAlignment="Center" HorizontalAlignment="Center"/>
-                  </GridViewColumn.Header>
-                  <GridViewColumn.CellTemplate>
-                    <DataTemplate>
-                      <CheckBox IsChecked="{Binding IsChecked}" VerticalAlignment="Center" HorizontalAlignment="Center"/>
-                    </DataTemplate>
-                  </GridViewColumn.CellTemplate>
-                </GridViewColumn>
-                <GridViewColumn Header="Name" Width="500" DisplayMemberBinding="{Binding Name}"/>
-                <GridViewColumn Header="Category" Width="150" DisplayMemberBinding="{Binding Category}"/>
-                <GridViewColumn Header="Status" Width="200" DisplayMemberBinding="{Binding Status}"/>
-                <GridViewColumn HeaderContainerStyle="{StaticResource NoGripperHeader}" Header="Workshop ID" Width="150" DisplayMemberBinding="{Binding WorkshopId}"/>
               </GridView>
             </ListView.View>
           </ListView>
