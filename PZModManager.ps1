@@ -1,7 +1,7 @@
 # PZ Mod Manager - Created by duy64. Licensed under the MIT License (see LICENSE.txt).
 #Requires -Version 5.1
 <#
-  PZ Mod Manager v416 - B42 Essentials: mod pack for Single-Player & Multiplayer
+  PZ Mod Manager v417 - B42 Essentials: mod pack for Single-Player & Multiplayer
   Full collection (~190 mods) + Cheat Menu: Rebuild, no Steam client needed.
 #>
 $ErrorActionPreference = 'Stop'
@@ -17,7 +17,7 @@ $NL          = [Environment]::NewLine
 # Target game build. B43 = change these lines; the layout repair and [10] checks derive from them.
 $GameBuild = '42'      # major build: version folder name (42/)
 $GameBuildFull = '42.21'  # current full build: versionMax floor for [10] warnings
-$ScriptVersion = '416'    # app version: shown in the menu header + GUI title
+$ScriptVersion = '417'    # app version: shown in the menu header + GUI title
 
 # All known categories, including ones with zero mods right now (Maps /
 # Audio / Zombies have no catalog mods yet). The category editor lists
@@ -2429,6 +2429,36 @@ function Install-Mod([string]$WorkshopId, [string]$Name) {
     }
   } else {
     Write-Host ("  Cached: " + $Name) -ForegroundColor DarkGray
+  }
+  # Completeness check: SteamCMD can report success with a truncated
+  # tree (large items especially) - the folder skeleton and mod.info
+  # arrive but the content does not, and every other check passes on
+  # mod.info alone (this is how the 6244 models pack 'installed' as a
+  # bare mod.info in Oct 2026). Compare the cache size against the
+  # Workshop file size and re-validate until it matches. Best effort:
+  # any API failure skips the check, it never blocks an install.
+  if (Test-Path $src) {
+    $expectedSize = [long]0
+    try {
+      $szResp = Invoke-WebRequest -Uri 'https://api.steampowered.com/ISteamRemoteStorage/GetPublishedFileDetails/v1/' -Method Post -Body ('itemcount=1&publishedfileids[0]=' + $WorkshopId) -ContentType 'application/x-www-form-urlencoded' -UseBasicParsing -TimeoutSec 5 -ErrorAction Stop
+      $szDetail = @(($szResp.Content | ConvertFrom-Json).response.publishedfiledetails)[0]
+      if ($szDetail -and $szDetail.file_size) { $expectedSize = [long]$szDetail.file_size }
+    } catch { }
+    if ($expectedSize -gt 0) {
+      for ($szAttempt = 1; $szAttempt -le 3; $szAttempt++) {
+        $actualSize = [long]0
+        $szSum = (Get-ChildItem $src -Recurse -File -ErrorAction SilentlyContinue | Measure-Object Length -Sum).Sum
+        if ($szSum) { $actualSize = [long]$szSum }
+        if ($actualSize -ge ($expectedSize * 0.95)) { break }
+        Write-Host ("  Download looks incomplete (" + $actualSize + " of " + $expectedSize + " bytes) - re-downloading (round " + $szAttempt + "/3)...") -ForegroundColor Yellow
+        [void](Invoke-SteamCmd @('+login', 'anonymous', '+workshop_download_item', $AppId, $WorkshopId, 'validate', '+quit'))
+      }
+      $szSum2 = (Get-ChildItem $src -Recurse -File -ErrorAction SilentlyContinue | Measure-Object Length -Sum).Sum
+      if ($szSum2 -and [long]$szSum2 -lt ($expectedSize * 0.95)) {
+        Write-Host ("  WARNING: download still incomplete after retries (" + [long]$szSum2 + " of " + $expectedSize + " bytes) - installing what is available.") -ForegroundColor Yellow
+      }
+      $modsFound = @(Get-ChildItem $src -Directory -Recurse | Where-Object { Test-Path (Join-Path $_.FullName 'mod.info') })
+    }
   }
   if ($modsFound.Count -eq 0) { Write-Host ("  WARNING: no mod found inside " + $WorkshopId) -ForegroundColor Yellow; return $false }
   # Dedup: same mod id appearing twice (e.g. 41/ and 42/ subfolders) - keep one, prefer the 42 build
