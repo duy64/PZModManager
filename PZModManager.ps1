@@ -1,7 +1,7 @@
 # PZ Mod Manager - Created by duy64. Licensed under the MIT License (see LICENSE.txt).
 #Requires -Version 5.1
 <#
-  PZ Mod Manager v410 - B42 Essentials: mod pack for Single-Player & Multiplayer
+  PZ Mod Manager v411 - B42 Essentials: mod pack for Single-Player & Multiplayer
   Full collection (~190 mods) + Cheat Menu: Rebuild, no Steam client needed.
 #>
 $ErrorActionPreference = 'Stop'
@@ -17,7 +17,7 @@ $NL          = [Environment]::NewLine
 # Target game build. B43 = change these lines; the layout repair and [10] checks derive from them.
 $GameBuild = '42'      # major build: version folder name (42/)
 $GameBuildFull = '42.21'  # current full build: versionMax floor for [10] warnings
-$ScriptVersion = '410'    # app version: shown in the menu header + GUI title
+$ScriptVersion = '411'    # app version: shown in the menu header + GUI title
 
 # All known categories, including ones with zero mods right now (Maps /
 # Audio / Zombies have no catalog mods yet). The category editor lists
@@ -733,15 +733,31 @@ function Start-WorkshopRatingsFetch($ids) {
       $ratings = @{}
       $firstErr = ''
       foreach ($k in @($existingRatings.Keys)) { $ratings[[string]$k] = [int]$existingRatings[$k] }
+      # Steam rate-limits after ~20 rapid requests (HTTP 429). Pace
+      # requests at ~2.5s apart; on failure wait 60s and retry once;
+      # abort the whole batch after 10 consecutive failures (likely
+      # already blocked - hammering only extends the block).
+      $consecFail = 0
       foreach ($wid in $needIds) {
+        if ($consecFail -ge 10) { $firstErr = 'ABORTED after 10 consecutive failures (rate limit). Partial results kept.'; break }
         $stars = 0
-        try {
-          $r = Invoke-WebRequest -Uri ('https://steamcommunity.com/sharedfiles/filedetails/?id=' + $wid) -Headers @{ 'User-Agent' = $ua } -UseBasicParsing -TimeoutSec 10 -ErrorAction Stop
-          $m = [regex]::Match([string]$r.Content, '(\d)-star_large\.png')
-          if ($m.Success) { $n = 0; if ([int]::TryParse($m.Groups[1].Value, [ref]$n) -and $n -ge 1 -and $n -le 5) { $stars = $n } }
-        } catch { if ($firstErr -eq '') { $firstErr = $_.Exception.Message } }
+        $attempt = 0
+        $ok = $false
+        while ($attempt -lt 2 -and -not $ok) {
+          $attempt++
+          try {
+            $r = Invoke-WebRequest -Uri ('https://steamcommunity.com/sharedfiles/filedetails/?id=' + $wid) -Headers @{ 'User-Agent' = $ua } -UseBasicParsing -TimeoutSec 10 -ErrorAction Stop
+            $m = [regex]::Match([string]$r.Content, '(\d)-star_large\.png')
+            if ($m.Success) { $n = 0; if ([int]::TryParse($m.Groups[1].Value, [ref]$n) -and $n -ge 1 -and $n -le 5) { $stars = $n } }
+            $ok = $true
+          } catch {
+            if ($firstErr -eq '') { $firstErr = $_.Exception.Message }
+            if ($attempt -lt 2) { Start-Sleep -Seconds 60 }
+          }
+        }
+        if ($ok) { $consecFail = 0 } else { $consecFail++ }
         $ratings[[string]$wid] = $stars
-        Start-Sleep -Milliseconds 300
+        Start-Sleep -Milliseconds 2500
       }
       $dbg = @()
       $dbg += ((Get-Date -Format 'yyyy-MM-dd HH:mm:ss') + ' scraped ' + $ratings.Count + ' ids')
