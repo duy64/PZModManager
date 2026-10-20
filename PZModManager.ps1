@@ -1,7 +1,7 @@
 # PZ Mod Manager - Created by duy64. Licensed under the MIT License (see LICENSE.txt).
 #Requires -Version 5.1
 <#
-  PZ Mod Manager v429 - B42 Essentials: mod pack for Single-Player & Multiplayer
+  PZ Mod Manager v430 - B42 Essentials: mod pack for Single-Player & Multiplayer
   Full collection (~190 mods) + Cheat Menu: Rebuild, no Steam client needed.
 #>
 $ErrorActionPreference = 'Stop'
@@ -17,7 +17,7 @@ $NL          = [Environment]::NewLine
 # Target game build. B43 = change these lines; the layout repair and [10] checks derive from them.
 $GameBuild = '42'      # major build: version folder name (42/)
 $GameBuildFull = '42.21'  # current full build: versionMax floor for [10] warnings
-$ScriptVersion = '429'    # app version: shown in the menu header + GUI title
+$ScriptVersion = '430'    # app version: shown in the menu header + GUI title
 
 # All known categories, including ones with zero mods right now (Maps /
 # Audio / Zombies have no catalog mods yet). The category editor lists
@@ -1736,6 +1736,7 @@ $DepMap = @{
   '2459400130' = @('3396446795')   # Dynamic Traits + Expanded Moodles -> Moodle Framework
   '3695874178' = @()               # Dynamic Events (base, no dependencies)
   '3717082142' = @('3695874178')   # Chaos Mod / Dynamic Events Special -> Dynamic Events
+  '3579088411' = @('3396446795', '3389605231')   # Infirmities -> Moodle Framework + TchernoLib
 }
 # ModID -> WorkshopID for generic require= resolution (when a mod needs a dep not in DepMap)
 $ModIdToWorkshop = @{
@@ -1746,6 +1747,7 @@ $ModIdToWorkshop = @{
   'YAPZLib' = '3624971238'
   'DynamicEvents' = '3695874178'
   'WarThunderVehicleLibrary' = '3399660368'
+  'TchernoLib' = '3389605231'
 }
 $script:DepDepth = 0
 
