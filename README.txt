@@ -1,4 +1,4 @@
-PZ MOD MANAGER v442
+PZ MOD MANAGER v443
 Created by duy64. Licensed under the MIT License (see LICENSE.txt).
 
 WHAT IT IS

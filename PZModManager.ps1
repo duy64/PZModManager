@@ -1,7 +1,7 @@
 # PZ Mod Manager - Created by duy64. Licensed under the MIT License (see LICENSE.txt).
 #Requires -Version 5.1
 <#
-  PZ Mod Manager v442 - B42 Essentials: mod pack for Single-Player & Multiplayer
+  PZ Mod Manager v443 - B42 Essentials: mod pack for Single-Player & Multiplayer
   Full collection (~190 mods) + Cheat Menu: Rebuild, no Steam client needed.
 #>
 $ErrorActionPreference = 'Stop'
@@ -17,7 +17,7 @@ $NL          = [Environment]::NewLine
 # Target game build. B43 = change these lines; the layout repair and [10] checks derive from them.
 $GameBuild = '42'      # major build: version folder name (42/)
 $GameBuildFull = '42.21'  # current full build: versionMax floor for [10] warnings
-$ScriptVersion = '442'    # app version: shown in the menu header + GUI title
+$ScriptVersion = '443'    # app version: shown in the menu header + GUI title
 
 # All known categories, including ones with zero mods right now (Maps /
 # Audio / Zombies have no catalog mods yet). The category editor lists
@@ -2276,14 +2276,18 @@ function Install-Mod([string]$WorkshopId, [string]$Name) {
   $modsFound = @()
   if (Test-Path $src) { $modsFound = @(Get-ChildItem $src -Recurse | Where-Object { $_.PSIsContainer } | Where-Object { Test-Path (Join-Path $_.FullName 'mod.info') }) }
   if ($modsFound.Count -eq 0) {
-    # Download with 1 retry - SteamCMD anonymous sometimes returns empty on first try
-    for ($attempt = 1; $attempt -le 2; $attempt++) {
-      Write-Host ("  Downloading [" + $Name + "] (attempt " + $attempt + "/2)...") -ForegroundColor DarkCyan
+    # Download with retries - SteamCMD anonymous sometimes returns
+    # empty on the first tries, large items especially. The last
+    # attempt clears the item cache first: a partial download left
+    # in the cache can make every later attempt fail the same way.
+    for ($attempt = 1; $attempt -le 3; $attempt++) {
+      if ($attempt -eq 3 -and (Test-Path $src)) { Write-Host '  Clearing the stuck download cache before the final attempt...' -ForegroundColor Yellow; Remove-Item $src -Recurse -Force -ErrorAction SilentlyContinue }
+      Write-Host ("  Downloading [" + $Name + "] (attempt " + $attempt + "/3)...") -ForegroundColor DarkCyan
       $scOut = Invoke-SteamCmd @('+login', 'anonymous', '+workshop_download_item', $AppId, $WorkshopId, 'validate', '+quit')
       if (Test-Path $src) { $modsFound = @(Get-ChildItem $src -Recurse | Where-Object { $_.PSIsContainer } | Where-Object { Test-Path (Join-Path $_.FullName 'mod.info') }) }
       if ($modsFound.Count -gt 0) { break }
       # Still empty after this attempt - on final attempt show SteamCMD errors for diagnosis
-      if ($attempt -eq 2) {
+      if ($attempt -eq 3) {
         Write-Host '  --- SteamCMD output (for diagnosis) ---' -ForegroundColor DarkGray
         @($scOut) | Where-Object { $_ -match 'ERROR|FAILED|failed|error|Timeout|timeout|Unable|denied|Rate|rate|limit|Login|login|Invalid' } | ForEach-Object { Write-Host ('    ' + $_.ToString().Trim()) -ForegroundColor DarkGray }
         Write-Host '  --- end SteamCMD output ---' -ForegroundColor DarkGray
@@ -5706,6 +5710,7 @@ function Install-GuiSelectedMods {
   $script:PendingVariantDecisions = @()
   $script:BatchPreCheckDecisions = $true
   $script:PendingPreCheckFailures = @()
+  $script:BatchUserSkipped = @()
   # Install every checked mod in the Mods tab (Install selected). Selection
   # is cleared after install and on filter changes (see Clear-GuiSelection).
   # Mods already installed are skipped by Install-Mod ('make sure it is there').
@@ -5752,6 +5757,7 @@ function Install-GuiSelectedMods {
         if ($script:AbortVariantBatch) { break }
         $dec = $conRes.Decisions[[string]$pd.WorkshopId]
         if (-not $dec) { $dec = @{ KeptIndices = @(0..(@($pd.VariantDirs).Count - 1)); KeptIds = @($pd.Candidates | ForEach-Object { [string]$_.WorkshopId }) } }
+        if ($dec -and @($dec.KeptIndices).Count -eq 0) { $script:BatchUserSkipped += [string]$pd.WorkshopId }
         if ((Complete-DeferredInstall $pd $dec) -eq $true) { $ok++ }
       }
     }
@@ -5780,13 +5786,25 @@ function Install-GuiSelectedMods {
       }
     }
   }
+  foreach ($pf2 in $preFailed) { if ((Get-InstalledWorkshopIds) -notcontains [string]$pf2.WorkshopId) { $script:BatchUserSkipped += [string]$pf2.WorkshopId } }
   $repairedNames = Repair-InstallRecords
   $doneText = 'Done: ' + $ok + '/' + $ids.Count + ' selected mods installed.'
   if (@($repairedNames).Count -gt 0) { $doneText += ' Install records repaired for: ' + (@($repairedNames) -join ', ') + '.' }
+  $failedNames = @()
+  if (-not $script:AbortVariantBatch) {
+    $installedNow = Get-InstalledWorkshopIds
+    foreach ($aid in $ids) {
+      if ($installedNow -notcontains [string]$aid -and $script:BatchUserSkipped -notcontains [string]$aid) { $failedNames += [string]$script:GuiSelectedMods[$aid] }
+    }
+    if ($failedNames.Count -gt 0) { $doneText += ' Failed: ' + ($failedNames -join ', ') + '.' }
+  }
   if ($script:AbortVariantBatch) { Set-GuiTransientStatus ('Installation cancelled.') } else { Set-GuiTransientStatus $doneText }
   Clear-GuiSelection
   # Standard: refresh every view after install (one composite call).
   Refresh-GuiAfterListChange
+  if ($failedNames.Count -gt 0) {
+    [void](Show-GuiMessageBox ("These mods could not be installed:`n`n" + ($failedNames -join "`n") + "`n`nThe download usually failed - large mods can need more than one try, and the manager now retries three times and clears a stuck download cache on the last attempt. Nothing was recorded for them; try installing them again.") 'PZ Mod Manager' ([System.Windows.MessageBoxButton]::OK) ([System.Windows.MessageBoxImage]::Warning))
+  }
   } catch {
     # Batch installs run synchronously under this function, so a
     # catch here captures the REAL stack + failing line (the main
