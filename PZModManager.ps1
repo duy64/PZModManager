@@ -1,7 +1,7 @@
 # PZ Mod Manager - Created by duy64. Licensed under the MIT License (see LICENSE.txt).
 #Requires -Version 5.1
 <#
-  PZ Mod Manager v403 - B42 Essentials: mod pack for Single-Player & Multiplayer
+  PZ Mod Manager v404 - B42 Essentials: mod pack for Single-Player & Multiplayer
   Full collection (~190 mods) + Cheat Menu: Rebuild, no Steam client needed.
 #>
 $ErrorActionPreference = 'Stop'
@@ -17,7 +17,7 @@ $NL          = [Environment]::NewLine
 # Target game build. B43 = change these lines; the layout repair and [10] checks derive from them.
 $GameBuild = '42'      # major build: version folder name (42/)
 $GameBuildFull = '42.21'  # current full build: versionMax floor for [10] warnings
-$ScriptVersion = '403'    # app version: shown in the menu header + GUI title
+$ScriptVersion = '404'    # app version: shown in the menu header + GUI title
 
 # All known categories, including ones with zero mods right now (Maps /
 # Audio / Zombies have no catalog mods yet). The category editor lists
@@ -6378,9 +6378,9 @@ function Show-Gui {
                     </DataTemplate>
                   </GridViewColumn.CellTemplate>
                 </GridViewColumn>
-                <GridViewColumn Header="Name" Width="500" DisplayMemberBinding="{Binding Name}"/>
+                <GridViewColumn Header="Name" Width="450" DisplayMemberBinding="{Binding Name}"/>
                 <GridViewColumn Header="Category" Width="150" DisplayMemberBinding="{Binding Category}"/>
-                <GridViewColumn Header="Status" Width="200" DisplayMemberBinding="{Binding Status}"/>
+                <GridViewColumn Header="Status" Width="150" DisplayMemberBinding="{Binding Status}"/>
                 <GridViewColumn Header="Workshop ID" Width="150" DisplayMemberBinding="{Binding WorkshopId}"/>
                 <GridViewColumn Header="Subscribers" Width="140" DisplayMemberBinding="{Binding Subscribers, StringFormat='{}{0:N0}'}"/>
                 <GridViewColumn Header="Rating" Width="80" DisplayMemberBinding="{Binding Rating}"/>
