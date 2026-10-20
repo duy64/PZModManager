@@ -1,7 +1,7 @@
 # PZ Mod Manager - Created by duy64. Licensed under the MIT License (see LICENSE.txt).
 #Requires -Version 5.1
 <#
-  PZ Mod Manager v421 - B42 Essentials: mod pack for Single-Player & Multiplayer
+  PZ Mod Manager v422 - B42 Essentials: mod pack for Single-Player & Multiplayer
   Full collection (~190 mods) + Cheat Menu: Rebuild, no Steam client needed.
 #>
 $ErrorActionPreference = 'Stop'
@@ -17,7 +17,7 @@ $NL          = [Environment]::NewLine
 # Target game build. B43 = change these lines; the layout repair and [10] checks derive from them.
 $GameBuild = '42'      # major build: version folder name (42/)
 $GameBuildFull = '42.21'  # current full build: versionMax floor for [10] warnings
-$ScriptVersion = '421'    # app version: shown in the menu header + GUI title
+$ScriptVersion = '422'    # app version: shown in the menu header + GUI title
 
 # All known categories, including ones with zero mods right now (Maps /
 # Audio / Zombies have no catalog mods yet). The category editor lists
@@ -5537,7 +5537,9 @@ function Install-GuiSelectedMods {
     $script:GuiWindow.Dispatcher.Invoke([System.Windows.Threading.DispatcherPriority]::Render, [System.Action]{})
     $pcCands = @()
     foreach ($pf in $preFailed) {
-      $pcCands += [PSCustomObject]@{ Name = [string]$pf.Name; WorkshopId = [string]$pf.WorkshopId; Cat = ''; Status = (($pf.Reasons -join '; ')); Details = ((($pf.Reasons -join "`n")) + (if (@($pf.WillInstallDeps).Count -gt 0) { "`n`nWill also install (dependencies): " + (($pf.WillInstallDeps -join ", ")) } else { "" })); IsChecked = $false }
+      $pfDetails = ($pf.Reasons -join "`n")
+      if (@($pf.WillInstallDeps).Count -gt 0) { $pfDetails += "`n`nWill also install (dependencies): " + ($pf.WillInstallDeps -join ", ") }
+      $pcCands += [PSCustomObject]@{ Name = [string]$pf.Name; WorkshopId = [string]$pf.WorkshopId; Cat = ''; Status = (($pf.Reasons -join '; ')); Details = $pfDetails; IsChecked = $false }
     }
     $pcCols = @( @{ Header='Name'; Property='Name'; Width=400 }, @{ Header='Workshop ID'; Property='WorkshopId'; Width=150 }, @{ Header='Reasons'; Property='Status'; Width=400 } )
     $pcRes = Show-GuiWpfPicker 'Pre-Install Compatibility Check' 'The following mods failed the pre-install compatibility check. Select the ones to install anyway (the rest will stay out of the game folder).' $pcCands $pcCols 'Install Selected'
