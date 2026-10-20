@@ -1,7 +1,7 @@
 # PZ Mod Manager - Created by duy64. Licensed under the MIT License (see LICENSE.txt).
 #Requires -Version 5.1
 <#
-  PZ Mod Manager v409 - B42 Essentials: mod pack for Single-Player & Multiplayer
+  PZ Mod Manager v410 - B42 Essentials: mod pack for Single-Player & Multiplayer
   Full collection (~190 mods) + Cheat Menu: Rebuild, no Steam client needed.
 #>
 $ErrorActionPreference = 'Stop'
@@ -17,7 +17,7 @@ $NL          = [Environment]::NewLine
 # Target game build. B43 = change these lines; the layout repair and [10] checks derive from them.
 $GameBuild = '42'      # major build: version folder name (42/)
 $GameBuildFull = '42.21'  # current full build: versionMax floor for [10] warnings
-$ScriptVersion = '409'    # app version: shown in the menu header + GUI title
+$ScriptVersion = '410'    # app version: shown in the menu header + GUI title
 
 # All known categories, including ones with zero mods right now (Maps /
 # Audio / Zombies have no catalog mods yet). The category editor lists
@@ -659,6 +659,9 @@ function Save-WorkshopNames {
   } catch { }
 }
 
+# Steam requires TLS 1.2+; PS 5.1 defaults to older protocols, which
+# silently breaks steamcommunity.com scrapes (empty ratings).
+try { [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12 } catch { }
 $WorkshopRatingsFile = Join-Path $PSScriptRoot 'workshop-ratings.json'
 function Format-Stars([int]$stars) {
   # 1-5 star display. 0 or negative = no rating data, show blank.
@@ -672,19 +675,22 @@ function Get-WorkshopItemStars([string]$id) {
   # does not expose ratings; the page HTML has e.g. 5-star_large.png.
   # Returns 0-5, or 0 on failure / no rating.
   try {
-    $r = Invoke-WebRequest -Uri ('https://steamcommunity.com/sharedfiles/filedetails/?id=' + $id) -UseBasicParsing -TimeoutSec 10 -ErrorAction Stop
+    $r = Invoke-WebRequest -Uri ('https://steamcommunity.com/sharedfiles/filedetails/?id=' + $id) -Headers @{ 'User-Agent' = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Safari/537.36' } -UseBasicParsing -TimeoutSec 10 -ErrorAction Stop
     $m = [regex]::Match([string]$r.Content, '(\d)-star_large\.png')
     if ($m.Success) { $n = 0; if ([int]::TryParse($m.Groups[1].Value, [ref]$n) -and $n -ge 1 -and $n -le 5) { return $n } }
   } catch { }
   return 0
 }
 function Load-WorkshopRatings {
-  # Returns @{ Ratings = hashtable(Wid->stars); Fetched = date-string }.
-  $res = @{ Ratings = @{}; Fetched = '' }
+  # Returns @{ Ratings; Fetched; Version }. Version 2 = TLS/user-agent
+  # fix (v410). Older files are treated as stale so the all-zeros
+  # cache from the broken scrape gets refetched once.
+  $res = @{ Ratings = @{}; Fetched = ''; Version = 0 }
   if (Test-Path $WorkshopRatingsFile) {
     try {
       $d = Get-Content $WorkshopRatingsFile -Raw -ErrorAction Stop | ConvertFrom-Json
       $res.Fetched = [string]$d.fetched
+      try { $res.Version = [int]$d.version } catch { }
       foreach ($p in $d.ratings.PSObject.Properties) { $res.Ratings[[string]$p.Name] = [int]$p.Value }
     } catch { }
   }
@@ -706,7 +712,7 @@ function Start-WorkshopRatingsFetch($ids) {
   # Skips IDs already cached and fresh (7-day TTL).
   $cached = Load-WorkshopRatings
   $stale = $true
-  if ($cached.Fetched -ne '') {
+  if ($cached.Version -ge 2 -and $cached.Fetched -ne '') {
     try { if (((Get-Date) - [datetime]::ParseExact($cached.Fetched, 'yyyy-MM-dd', $null)).Days -le 7) { $stale = $false } } catch { }
   }
   $need = @()
@@ -722,25 +728,29 @@ function Start-WorkshopRatingsFetch($ids) {
     $ps.Runspace = $rs
     $scriptBlock = {
       param($needIds, $cacheFile, $existingRatings)
+      try { [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12 } catch { }
+      $ua = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Safari/537.36'
       $ratings = @{}
+      $firstErr = ''
       foreach ($k in @($existingRatings.Keys)) { $ratings[[string]$k] = [int]$existingRatings[$k] }
       foreach ($wid in $needIds) {
         $stars = 0
         try {
-          $r = Invoke-WebRequest -Uri ('https://steamcommunity.com/sharedfiles/filedetails/?id=' + $wid) -UseBasicParsing -TimeoutSec 10 -ErrorAction Stop
+          $r = Invoke-WebRequest -Uri ('https://steamcommunity.com/sharedfiles/filedetails/?id=' + $wid) -Headers @{ 'User-Agent' = $ua } -UseBasicParsing -TimeoutSec 10 -ErrorAction Stop
           $m = [regex]::Match([string]$r.Content, '(\d)-star_large\.png')
           if ($m.Success) { $n = 0; if ([int]::TryParse($m.Groups[1].Value, [ref]$n) -and $n -ge 1 -and $n -le 5) { $stars = $n } }
-        } catch { }
+        } catch { if ($firstErr -eq '') { $firstErr = $_.Exception.Message } }
         $ratings[[string]$wid] = $stars
         Start-Sleep -Milliseconds 300
       }
       $dbg = @()
       $dbg += ((Get-Date -Format 'yyyy-MM-dd HH:mm:ss') + ' scraped ' + $ratings.Count + ' ids')
+      if ($firstErr -ne '') { $dbg += ('FIRST ERROR: ' + $firstErr) }
       try {
         # Manual JSON (no assemblies - JavaScriptSerializer is .NET
         # Framework only and ConvertTo-Json is unreliable for this).
         $jb = New-Object System.Text.StringBuilder
-        [void]$jb.Append('{"fetched":"')
+        [void]$jb.Append('{"version":2,"fetched":"')
         [void]$jb.Append((Get-Date -Format 'yyyy-MM-dd'))
         [void]$jb.Append('","ratings":{')
         $first = $true

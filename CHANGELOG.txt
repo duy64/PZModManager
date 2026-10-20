@@ -1,6 +1,7 @@
 PZ MOD MANAGER - FULL CHANGELOG
 Created by duy64. Licensed under the MIT License (see LICENSE.txt).
 
+v410: Fixed star ratings scraping on Windows (TLS 1.2 + browser user-agent; the old scrape silently failed and cached zeros). Old all-zeros cache is discarded and refetched once. First scrape error is now logged to workshop-ratings.debug.txt.
 v409: Star ratings now appear automatically - the app refreshes the list when the background scrape finishes (previously you had to trigger a refresh manually). Also replaced the fragile JSON writer with a dependency-free one and added a debug log.
 v408: Fixed star ratings showing blank - the ratings merge into the stats was a silent no-op in v406/v407 (edit never landed). Ratings now display.
 v407: Pack detail member table now has click-to-sort on all columns (Name, Category, Status, Subscribers, Rating, Workshop ID) with sort indicators.
