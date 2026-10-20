@@ -1,7 +1,7 @@
 # PZ Mod Manager - Created by duy64. Licensed under the MIT License (see LICENSE.txt).
 #Requires -Version 5.1
 <#
-  PZ Mod Manager v398 - B42 Essentials: mod pack for Single-Player & Multiplayer
+  PZ Mod Manager v399 - B42 Essentials: mod pack for Single-Player & Multiplayer
   Full collection (~190 mods) + Cheat Menu: Rebuild, no Steam client needed.
 #>
 $ErrorActionPreference = 'Stop'
@@ -17,7 +17,7 @@ $NL          = [Environment]::NewLine
 # Target game build. B43 = change these lines; the layout repair and [10] checks derive from them.
 $GameBuild = '42'      # major build: version folder name (42/)
 $GameBuildFull = '42.21'  # current full build: versionMax floor for [10] warnings
-$ScriptVersion = '398'    # app version: shown in the menu header + GUI title
+$ScriptVersion = '399'    # app version: shown in the menu header + GUI title
 
 # All known categories, including ones with zero mods right now (Maps /
 # Audio / Zombies have no catalog mods yet). The category editor lists
@@ -660,11 +660,12 @@ function Save-WorkshopNames {
 }
 
 function Get-WorkshopStats($ids) {
-  # Subscribers per Workshop ID (popularity). File cache
-  # workshop-stats.json (7-day TTL) + in-memory cache per session.
-  # Missing/stale entries are fetched via GetPublishedFileDetails
-  # (batched, 100 per call). Offline/API failure -> use cache or 0.
-  # Returns a hashtable WorkshopId -> [long] subscribers.
+  # Subscribers + ratings per Workshop ID. File cache workshop-stats.json
+  # (7-day TTL) + in-memory cache per session. Missing/stale entries are
+  # fetched via GetPublishedFileDetails (batched, 100 per call).
+  # Offline/API failure -> use cache or zeros.
+  # Returns a hashtable WorkshopId -> PSCustomObject(Subscribers, Score,
+  # VotesUp, VotesDown). Score is 0-1 (fraction positive).
   if ($script:WorkshopStats -eq $null) {
     $script:WorkshopStats = @{}
     $script:WorkshopStatsFetched = ''
@@ -672,7 +673,15 @@ function Get-WorkshopStats($ids) {
       try {
         $d = Get-Content $WorkshopStatsFile -Raw -ErrorAction Stop | ConvertFrom-Json
         $script:WorkshopStatsFetched = [string]$d.fetched
-        foreach ($p in $d.stats.PSObject.Properties) { $script:WorkshopStats[[string]$p.Name] = [long]$p.Value }
+        foreach ($p in $d.stats.PSObject.Properties) {
+          $v = $p.Value
+          if ($v -is [long] -or $v -is [int]) {
+            # Legacy cache format (subscribers only) - migrate.
+            $script:WorkshopStats[[string]$p.Name] = [PSCustomObject]@{ Subscribers = [long]$v; Score = [double]0; VotesUp = [long]0; VotesDown = [long]0 }
+          } else {
+            $script:WorkshopStats[[string]$p.Name] = [PSCustomObject]@{ Subscribers = [long]$v.subscribers; Score = [double]$v.score; VotesUp = [long]$v.votesUp; VotesDown = [long]$v.votesDown }
+          }
+        }
       } catch { }
     }
   }
@@ -693,9 +702,12 @@ function Get-WorkshopStats($ids) {
         $d = $r.Content | ConvertFrom-Json
         foreach ($item in @($d.response.publishedfiledetails)) {
           $wid = [string]$item.publishedfileid
-          $subs = 0
+          $subs = 0; $score = 0; $up = 0; $down = 0
           try { $subs = [long]$item.subscriptions } catch { }
-          $script:WorkshopStats[$wid] = $subs
+          try { $score = [double]$item.vote_data.score } catch { }
+          try { $up = [long]$item.vote_data.votes_up } catch { }
+          try { $down = [long]$item.vote_data.votes_down } catch { }
+          $script:WorkshopStats[$wid] = [PSCustomObject]@{ Subscribers = $subs; Score = $score; VotesUp = $up; VotesDown = $down }
         }
       } catch { }
     }
@@ -704,7 +716,15 @@ function Get-WorkshopStats($ids) {
       $obj = New-Object PSObject
       $obj | Add-Member -NotePropertyName 'fetched' -NotePropertyValue $script:WorkshopStatsFetched
       $st = New-Object PSObject
-      foreach ($k in @($script:WorkshopStats.Keys | Sort-Object)) { $st | Add-Member -NotePropertyName $k -NotePropertyValue $script:WorkshopStats[$k] }
+      foreach ($k in @($script:WorkshopStats.Keys | Sort-Object)) {
+        $sv = $script:WorkshopStats[$k]
+        $svObj = New-Object PSObject
+        $svObj | Add-Member -NotePropertyName 'subscribers' -NotePropertyValue ([long]$sv.Subscribers)
+        $svObj | Add-Member -NotePropertyName 'score' -NotePropertyValue ([double]$sv.Score)
+        $svObj | Add-Member -NotePropertyName 'votesUp' -NotePropertyValue ([long]$sv.VotesUp)
+        $svObj | Add-Member -NotePropertyName 'votesDown' -NotePropertyValue ([long]$sv.VotesDown)
+        $st | Add-Member -NotePropertyName $k -NotePropertyValue $svObj
+      }
       $obj | Add-Member -NotePropertyName 'stats' -NotePropertyValue $st
       ($obj | ConvertTo-Json -Depth 3) | Set-Content $WorkshopStatsFile -Encoding UTF8 -Force
     } catch { }
@@ -3668,7 +3688,13 @@ function Sort-GuiMods($list, $installed, $packNamesMap) {
     # NOTE: this sorts the RAW mods (no Subscribers property yet - rows
     # get it after the sort), so read the stats cache directly.
     $stats = Get-WorkshopStats
-    $key = { $v = [long]0; if ($stats -and $stats.ContainsKey([string]$_.WorkshopId)) { try { $v = [long]$stats[[string]$_.WorkshopId] } catch { } }; $v }
+    $key = { $v = [long]0; if ($stats -and $stats.ContainsKey([string]$_.WorkshopId)) { try { $v = [long]$stats[[string]$_.WorkshopId].Subscribers } catch { } }; $v }
+    if ($desc) { return @($list | Sort-Object $key, Name -Descending) } else { return @($list | Sort-Object $key, Name) }
+  }
+  if ($col -eq 'Rating') {
+    # Sort by raw Score (0-1) from the stats cache.
+    $stats = Get-WorkshopStats
+    $key = { $v = [double]0; if ($stats -and $stats.ContainsKey([string]$_.WorkshopId)) { try { $v = [double]$stats[[string]$_.WorkshopId].Score } catch { } }; $v }
     if ($desc) { return @($list | Sort-Object $key, Name -Descending) } else { return @($list | Sort-Object $key, Name) }
   }
   if ($col -eq 'Packs') {
@@ -3977,7 +4003,8 @@ function Refresh-GuiMods {
       Category = [string]$m.Cat
       Status = $status
       WorkshopId = [string]$m.WorkshopId
-      Subscribers = $(if ($stats -and $stats.ContainsKey([string]$m.WorkshopId)) { [long]$stats[[string]$m.WorkshopId] } else { [long]0 })
+      Subscribers = $(if ($stats -and $stats.ContainsKey([string]$m.WorkshopId)) { [long]$stats[[string]$m.WorkshopId].Subscribers } else { [long]0 })
+      Rating = $(if ($stats -and $stats.ContainsKey([string]$m.WorkshopId)) { [string]([math]::Round([double]$stats[[string]$m.WorkshopId].Score * 100)) + '%' } else { '' })
       Date = $dateVal
       Packs = $packNames
       IsChecked = $script:GuiSelectedMods.ContainsKey([string]$m.WorkshopId)
@@ -3999,15 +4026,16 @@ function Refresh-GuiMods {
   # GridView header sort indicators (reset to plain, then mark the sorted one).
   if ($script:GuiModList.View -and $script:GuiModList.View.Columns) {
     $gvCols = $script:GuiModList.View.Columns
-    $plain = @('Name', 'Category', 'Status', 'Workshop ID', 'Subscribers', 'Installed Date', 'Packs')
-    for ($i = 0; $i -lt 7 -and ($i + 1) -lt $gvCols.Count; $i++) { $gvCols[$i + 1].Header = $plain[$i] }
+    $plain = @('Name', 'Category', 'Status', 'Workshop ID', 'Subscribers', 'Rating', 'Installed Date', 'Packs')
+    for ($i = 0; $i -lt 8 -and ($i + 1) -lt $gvCols.Count; $i++) { $gvCols[$i + 1].Header = $plain[$i] }
     if ($script:GuiModsSortColumn -eq 'Name') { $gvCols[1].Header = if ($script:GuiModsSortDescending) { 'Name (Z-A)' } else { 'Name (A-Z)' } }
     elseif ($script:GuiModsSortColumn -eq 'Category') { $gvCols[2].Header = if ($script:GuiModsSortDescending) { 'Category (Z-A)' } else { 'Category (A-Z)' } }
     elseif ($script:GuiModsSortColumn -eq 'Status') { $gvCols[3].Header = if ($script:GuiModsSortDescending) { 'Status (Not installed first)' } else { 'Status (Installed first)' } }
     elseif ($script:GuiModsSortColumn -eq 'WorkshopId') { $gvCols[4].Header = if ($script:GuiModsSortDescending) { 'Workshop ID (9-0)' } else { 'Workshop ID (0-9)' } }
-    elseif ($script:GuiModsSortColumn -eq 'Date') { $gvCols[6].Header = if ($script:GuiModsSortDescending) { 'Installed Date (newest)' } else { 'Installed Date (oldest)' } }
+    elseif ($script:GuiModsSortColumn -eq 'Date') { $gvCols[7].Header = if ($script:GuiModsSortDescending) { 'Installed Date (newest)' } else { 'Installed Date (oldest)' } }
     elseif ($script:GuiModsSortColumn -eq 'Subscribers') { $gvCols[5].Header = if ($script:GuiModsSortDescending) { 'Subscribers (9-0)' } else { 'Subscribers (0-9)' } }
-    elseif ($script:GuiModsSortColumn -eq 'Packs') { $gvCols[7].Header = if ($script:GuiModsSortDescending) { 'Packs (Z-A)' } else { 'Packs (A-Z)' } }
+    elseif ($script:GuiModsSortColumn -eq 'Rating') { $gvCols[6].Header = if ($script:GuiModsSortDescending) { 'Rating (9-0)' } else { 'Rating (0-9)' } }
+    elseif ($script:GuiModsSortColumn -eq 'Packs') { $gvCols[8].Header = if ($script:GuiModsSortDescending) { 'Packs (Z-A)' } else { 'Packs (A-Z)' } }
   }
   $listName = ''
   $active = Get-ActiveListSafe
@@ -4370,15 +4398,21 @@ function Refresh-GuiPackDetail($pack) {
   }
   $installed = @(Get-InstalledWorkshopIds)
   $members = @(Get-PackModsFull $pack)
+  $pStats = Get-WorkshopStats @($members | ForEach-Object { [string]$_.WorkshopId })
   $items = @()
   foreach ($m in $members) {
     $isInstalled = $installed -contains [string]$m.WorkshopId
+    $pwid = [string]$m.WorkshopId
+    $psubs = [long]0; $prate = ''
+    if ($pStats -and $pStats.ContainsKey($pwid)) { $psubs = [long]$pStats[$pwid].Subscribers; $prate = [string]([math]::Round([double]$pStats[$pwid].Score * 100)) + '%' }
     $items += [PSCustomObject]@{
       Name = [string]$m.Name
       Category = [string]$m.Cat
       Status = if ($isInstalled) { 'Installed' } else { 'Not installed' }
-      WorkshopId = [string]$m.WorkshopId
-      IsChecked = $script:GuiSelectedMods.ContainsKey([string]$m.WorkshopId)
+      Subscribers = $psubs
+      Rating = $prate
+      WorkshopId = $pwid
+      IsChecked = $script:GuiSelectedMods.ContainsKey($pwid)
     }
   }
   $script:GuiPackMemberList.ItemsSource = $items
@@ -5066,8 +5100,10 @@ function Show-GuiWorkshopSearch {
     $gridView = $window.FindName('SearchGridView')
     $checkTpl = [System.Windows.Markup.XamlReader]::Parse('<DataTemplate xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"><CheckBox IsChecked="{Binding IsChecked}" HorizontalAlignment="Center" VerticalAlignment="Center"/></DataTemplate>')
     Build-StandardGridColumns $gridView @(
-      @{ Header = 'Name'; Property = 'Name'; Width = 620 },
-      @{ Header = 'Workshop ID'; Property = 'WorkshopId'; Width = 300 }
+      @{ Header = 'Name'; Property = 'Name'; Width = 440 },
+      @{ Header = 'Subscribers'; Property = 'Subscribers'; Width = 120 },
+      @{ Header = 'Rating'; Property = 'Rating'; Width = 80 },
+      @{ Header = 'Workshop ID'; Property = 'WorkshopId'; Width = 280 }
     ) $checkTpl $window.FindResource('NoGripperHeader')
     Register-LastColumnFill $listView
     $state = @{ Rows = @(); SortProp = ''; SortDesc = $false }
@@ -5112,7 +5148,13 @@ function Show-GuiWorkshopSearch {
         else { $window.FindName('SearchInstruction').Text = ('No results for "' + $q.Trim() + '".') }
         $state.Rows = @()
       } else {
-        $state.Rows = @($found | ForEach-Object { [PSCustomObject]@{ IsChecked = $true; Name = [string]$_.Name; WorkshopId = [string]$_.WorkshopId } })
+        $sStats = Get-WorkshopStats @($found | ForEach-Object { [string]$_.WorkshopId })
+        $state.Rows = @($found | ForEach-Object {
+          $swid = [string]$_.WorkshopId
+          $ssubs = [long]0; $srate = ''
+          if ($sStats -and $sStats.ContainsKey($swid)) { $ssubs = [long]$sStats[$swid].Subscribers; $srate = [string]([math]::Round([double]$sStats[$swid].Score * 100)) + '%' }
+          [PSCustomObject]@{ IsChecked = $true; Name = [string]$_.Name; Subscribers = $ssubs; Rating = $srate; WorkshopId = $swid }
+        })
         $window.FindName('SearchInstruction').Text = ('Found ' + $found.Count.ToString() + ' result(s) - tick the mods to add.')
       }
       & $refresh
@@ -5126,7 +5168,13 @@ function Show-GuiWorkshopSearch {
         else { $window.FindName('SearchInstruction').Text = 'No popular mods found.' }
         $state.Rows = @()
       } else {
-        $state.Rows = @($found | ForEach-Object { [PSCustomObject]@{ IsChecked = $true; Name = [string]$_.Name; WorkshopId = [string]$_.WorkshopId } })
+        $sStats = Get-WorkshopStats @($found | ForEach-Object { [string]$_.WorkshopId })
+        $state.Rows = @($found | ForEach-Object {
+          $swid = [string]$_.WorkshopId
+          $ssubs = [long]0; $srate = ''
+          if ($sStats -and $sStats.ContainsKey($swid)) { $ssubs = [long]$sStats[$swid].Subscribers; $srate = [string]([math]::Round([double]$sStats[$swid].Score * 100)) + '%' }
+          [PSCustomObject]@{ IsChecked = $true; Name = [string]$_.Name; Subscribers = $ssubs; Rating = $srate; WorkshopId = $swid }
+        })
         $window.FindName('SearchInstruction').Text = ('Found ' + $found.Count.ToString() + ' popular mod(s) - tick the mods to add. (Ranked by relevance, not subscriptions.)')
       }
       & $refresh
@@ -6285,6 +6333,7 @@ function Show-Gui {
                 <GridViewColumn Header="Status" Width="200" DisplayMemberBinding="{Binding Status}"/>
                 <GridViewColumn Header="Workshop ID" Width="150" DisplayMemberBinding="{Binding WorkshopId}"/>
                 <GridViewColumn Header="Subscribers" Width="140" DisplayMemberBinding="{Binding Subscribers, StringFormat='{}{0:N0}'}"/>
+                <GridViewColumn Header="Rating" Width="80" DisplayMemberBinding="{Binding Rating}"/>
                 <GridViewColumn Header="Installed Date" Width="180" DisplayMemberBinding="{Binding Date}"/>
                 <GridViewColumn HeaderContainerStyle="{StaticResource NoGripperHeader}" Header="Packs" Width="200" DisplayMemberBinding="{Binding Packs}"/>
               </GridView>
@@ -6357,9 +6406,11 @@ function Show-Gui {
                     </DataTemplate>
                   </GridViewColumn.CellTemplate>
                 </GridViewColumn>
-                <GridViewColumn Header="Name" Width="500" DisplayMemberBinding="{Binding Name}"/>
+                <GridViewColumn Header="Name" Width="400" DisplayMemberBinding="{Binding Name}"/>
                 <GridViewColumn Header="Category" Width="150" DisplayMemberBinding="{Binding Category}"/>
-                <GridViewColumn Header="Status" Width="200" DisplayMemberBinding="{Binding Status}"/>
+                <GridViewColumn Header="Status" Width="150" DisplayMemberBinding="{Binding Status}"/>
+                <GridViewColumn Header="Subscribers" Width="120" DisplayMemberBinding="{Binding Subscribers, StringFormat='{}{0:N0}'}"/>
+                <GridViewColumn Header="Rating" Width="80" DisplayMemberBinding="{Binding Rating}"/>
                 <GridViewColumn HeaderContainerStyle="{StaticResource NoGripperHeader}" Header="Workshop ID" Width="150" DisplayMemberBinding="{Binding WorkshopId}"/>
               </GridView>
             </ListView.View>
@@ -6584,8 +6635,9 @@ function Show-Gui {
           elseif ($idx -eq 3) { $sortCol = 'Status' }
           elseif ($idx -eq 4) { $sortCol = 'WorkshopId' }
           elseif ($idx -eq 5) { $sortCol = 'Subscribers' }
-          elseif ($idx -eq 6) { $sortCol = 'Date' }
-          elseif ($idx -eq 7) { $sortCol = 'Packs' }
+          elseif ($idx -eq 6) { $sortCol = 'Rating' }
+          elseif ($idx -eq 7) { $sortCol = 'Date' }
+          elseif ($idx -eq 8) { $sortCol = 'Packs' }
           if ($sortCol) { Cycle-GuiModsSort $sortCol }
         }
       }
