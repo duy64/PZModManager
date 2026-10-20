@@ -1,7 +1,7 @@
 # PZ Mod Manager - Created by duy64. Licensed under the MIT License (see LICENSE.txt).
 #Requires -Version 5.1
 <#
-  PZ Mod Manager v438 - B42 Essentials: mod pack for Single-Player & Multiplayer
+  PZ Mod Manager v439 - B42 Essentials: mod pack for Single-Player & Multiplayer
   Full collection (~190 mods) + Cheat Menu: Rebuild, no Steam client needed.
 #>
 $ErrorActionPreference = 'Stop'
@@ -17,7 +17,7 @@ $NL          = [Environment]::NewLine
 # Target game build. B43 = change these lines; the layout repair and [10] checks derive from them.
 $GameBuild = '42'      # major build: version folder name (42/)
 $GameBuildFull = '42.21'  # current full build: versionMax floor for [10] warnings
-$ScriptVersion = '438'    # app version: shown in the menu header + GUI title
+$ScriptVersion = '439'    # app version: shown in the menu header + GUI title
 
 # All known categories, including ones with zero mods right now (Maps /
 # Audio / Zombies have no catalog mods yet). The category editor lists
@@ -272,6 +272,7 @@ $Mods = @(
   @{ Name='[B42] Immersive Camos'; WorkshopId='3454414190'; Cat='Clothing & Gear' },
   @{ Name='Improved Blood Effects'; WorkshopId='2648152698'; Cat='Content Mods' },
   @{ Name='Decoholic'; WorkshopId='3197857648'; Cat='Content Mods' },
+  @{ Name="Pillow's Random Spawns [B42]"; WorkshopId='1911132112'; Cat='Content Mods' },
   @{ Name='Dynamic Traits and Expanded Moodles'; WorkshopId='2459400130'; Cat='Content Mods' },
   @{ Name='[B42] Spawn with items by occupation'; WorkshopId='2747517727'; Cat='Content Mods' },
   @{ Name='Horse Mod [B42.20+/MP]'; WorkshopId='3661336777'; Cat='Content Mods' },
@@ -636,7 +637,13 @@ function Get-AllPacks([switch]$AllLists) {
   return $out
 }
 
-$script:RetiredWorkshopIds = @('3784151798','3780639614','3490188370','3526517370','3504753006','3607686447','3171815531','1911132112')
+$script:RetiredWorkshopIds = @('3784151798','3780639614','3490188370','3526517370','3504753006','3607686447','3171815531')
+# Catalog mods NOT seeded into the shipped Default list (and not
+# added to it by the tracksCatalog sync). They stay in the full
+# catalog: anyone can add them to any list manually at any time -
+# the exclusion only keeps the curator's personal dislikes out of
+# the default set every new user starts with.
+$script:DefaultExcludedIds = @('1911132112')
 function Set-ModsFromNamedList([string]$safe) {
   if (-not (Get-NamedListData $safe)) { return $false }
   $m = @()
@@ -923,7 +930,7 @@ function Migrate-ListStorage {
     while (Test-Path $bk) { $bi++; $bk = Join-Path $ListsDir ('default-v205-backup-{0}.json' -f $bi) }
     Move-Item -Path (Join-Path $ListsDir 'default.json') -Destination $bk -Force -ErrorAction SilentlyContinue
   }
-  $mods = @($Mods | ForEach-Object { [PSCustomObject]@{ workshopId = [string]$_.WorkshopId; name = [string]$_.Name; cat = [string]$_.Cat } })
+  $mods = @($Mods | Where-Object { $script:DefaultExcludedIds -notcontains [string]$_.WorkshopId } | ForEach-Object { [PSCustomObject]@{ workshopId = [string]$_.WorkshopId; name = [string]$_.Name; cat = [string]$_.Cat } })
   Save-NamedListData 'default' 'Default' $mods @() @() $true
   # Move custom-packs.json packs into their list files.
   $oldPacks = Join-Path $PSScriptRoot 'custom-packs.json'
@@ -967,7 +974,7 @@ Migrate-ListStorage
 # the app never starts with an empty list set. An emptied Default
 # is NOT restored - only a missing Default (zero lists) is.
 if (@(Get-NamedLists).Count -eq 0) {
-  $mods = @($Mods | ForEach-Object { [PSCustomObject]@{ workshopId = [string]$_.WorkshopId; name = [string]$_.Name; cat = [string]$_.Cat } })
+  $mods = @($Mods | Where-Object { $script:DefaultExcludedIds -notcontains [string]$_.WorkshopId } | ForEach-Object { [PSCustomObject]@{ workshopId = [string]$_.WorkshopId; name = [string]$_.Name; cat = [string]$_.Cat } })
   Save-NamedListData 'default' 'Default' $mods @() @() $true
   Set-ActiveListSafe 'default'
 }
@@ -995,6 +1002,7 @@ if ($__def -and $__tracks) {
   foreach ($__e in @($__def.mods)) { $__have[[string]$__e.workshopId] = $true }
   $__missing = @()
   foreach ($__cm in @($Mods)) {
+    if ($script:DefaultExcludedIds -contains [string]$__cm.WorkshopId) { continue }
     if (-not $__have.ContainsKey([string]$__cm.WorkshopId)) {
       $__missing += [PSCustomObject]@{ workshopId = [string]$__cm.WorkshopId; name = [string]$__cm.Name; cat = [string]$__cm.Cat; autoDep = $false }
     }
