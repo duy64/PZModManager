@@ -1,7 +1,7 @@
 # PZ Mod Manager - Created by duy64. Licensed under the MIT License (see LICENSE.txt).
 #Requires -Version 5.1
 <#
-  PZ Mod Manager v423 - B42 Essentials: mod pack for Single-Player & Multiplayer
+  PZ Mod Manager v424 - B42 Essentials: mod pack for Single-Player & Multiplayer
   Full collection (~190 mods) + Cheat Menu: Rebuild, no Steam client needed.
 #>
 $ErrorActionPreference = 'Stop'
@@ -17,7 +17,7 @@ $NL          = [Environment]::NewLine
 # Target game build. B43 = change these lines; the layout repair and [10] checks derive from them.
 $GameBuild = '42'      # major build: version folder name (42/)
 $GameBuildFull = '42.21'  # current full build: versionMax floor for [10] warnings
-$ScriptVersion = '423'    # app version: shown in the menu header + GUI title
+$ScriptVersion = '424'    # app version: shown in the menu header + GUI title
 
 # All known categories, including ones with zero mods right now (Maps /
 # Audio / Zombies have no catalog mods yet). The category editor lists
@@ -3638,6 +3638,24 @@ function Move-GuiSelectedMods {
 }
 
 
+function Write-GuiErrorDump($err, [string]$where) {
+  # Full error record for gui-error.txt: type, message, the exact
+  # failing line, and the stack AT THE CATCH SITE (the main Show-Gui
+  # catch only sees a dispatcher-collapsed stack, which hid the real
+  # frame twice - v421 search crash). Never throws.
+  try {
+    $diag = @()
+    $diag += ('Date: ' + (Get-Date -Format 'yyyy-MM-dd HH:mm:ss'))
+    $diag += ('Where: ' + $where)
+    $diag += ('Type: ' + $err.Exception.GetType().FullName)
+    $diag += ('Message: ' + $err.Exception.Message)
+    if ($err.InvocationInfo) { $diag += ('Line: ' + $err.InvocationInfo.ScriptLineNumber + ' : ' + [string]$err.InvocationInfo.Line) }
+    $diag += 'Stack:'
+    $diag += [string]$err.ScriptStackTrace
+    ($diag -join [Environment]::NewLine) | Set-Content (Join-Path $PSScriptRoot 'gui-error.txt') -Encoding UTF8 -Force
+  } catch { }
+}
+
 function Set-GuiTransientStatus([string]$text, [int]$seconds = 5) {
   # Show a result message in the status bar, then restore the tab status
   # after $seconds. A new message restarts the timer, so the latest result
@@ -6788,7 +6806,7 @@ function Show-Gui {
     Refresh-GuiNamedLists
     Refresh-GuiCategoriesTab
 
-    $debouncedModsSearch = New-GuiDebounce 300 { Clear-GuiSelection; Refresh-GuiMods }
+    $debouncedModsSearch = New-GuiDebounce 300 { try { Clear-GuiSelection; Refresh-GuiMods } catch { Write-GuiErrorDump $_ 'ModsSearch' } }
     $script:GuiSearchBox.Add_TextChanged({ & $debouncedModsSearch })
     $script:GuiCategoryBox.Add_SelectionChanged({
       $script:GuiCategory = $script:GuiCategoryBox.SelectedItem
@@ -7084,11 +7102,11 @@ function Show-Gui {
     $script:GuiNewListButton.Add_Click({ New-GuiNamedList })
     $script:GuiImportListButton.Add_Click({ Import-GuiList })
     $script:GuiExportSelectedListButton.Add_Click({ Export-GuiList })
-    $debouncedPacksSearch = New-GuiDebounce 300 { $script:GuiPackSearch = $script:GuiPackSearchBox.Text; Clear-GuiSelection; Refresh-GuiPacks }
+    $debouncedPacksSearch = New-GuiDebounce 300 { try { $script:GuiPackSearch = $script:GuiPackSearchBox.Text; Clear-GuiSelection; Refresh-GuiPacks } catch { Write-GuiErrorDump $_ 'PacksSearch' } }
     $script:GuiPackSearchBox.Add_TextChanged({ & $debouncedPacksSearch })
-    $debouncedListsSearch = New-GuiDebounce 300 { $script:GuiListSearch = $script:GuiListSearchBox.Text; Clear-GuiSelection; Refresh-GuiNamedLists }
+    $debouncedListsSearch = New-GuiDebounce 300 { try { $script:GuiListSearch = $script:GuiListSearchBox.Text; Clear-GuiSelection; Refresh-GuiNamedLists } catch { Write-GuiErrorDump $_ 'ListsSearch' } }
     $script:GuiListSearchBox.Add_TextChanged({ & $debouncedListsSearch })
-    $debouncedCatsSearch = New-GuiDebounce 300 { $script:GuiCategorySearch = $script:GuiCategorySearchBox.Text; Clear-GuiSelection; Refresh-GuiCategoriesTab }
+    $debouncedCatsSearch = New-GuiDebounce 300 { try { $script:GuiCategorySearch = $script:GuiCategorySearchBox.Text; Clear-GuiSelection; Refresh-GuiCategoriesTab } catch { Write-GuiErrorDump $_ 'CategoriesSearch' } }
     $script:GuiCategorySearchBox.Add_TextChanged({ & $debouncedCatsSearch })
     $script:GuiTabControl.Add_SelectionChanged({
       if ($script:GuiSelectionDirty) {
@@ -7129,15 +7147,7 @@ function Show-Gui {
   } catch {
     Show-Console
     $err = $_
-    try {
-      $diag = @()
-      $diag += ('Date: ' + (Get-Date -Format 'yyyy-MM-dd HH:mm:ss'))
-      $diag += ('Type: ' + $err.Exception.GetType().FullName)
-      $diag += ('Message: ' + $err.Exception.Message)
-      $diag += 'Stack:'
-      $diag += [string]$err.ScriptStackTrace
-      ($diag -join [Environment]::NewLine) | Set-Content (Join-Path $PSScriptRoot 'gui-error.txt') -Encoding UTF8 -Force
-    } catch { }
+    Write-GuiErrorDump $err 'Show-Gui'
     $script:GuiMode = $false
     Write-Host ('GUI error: ' + $err.Exception.Message) -ForegroundColor Red
     Pause
