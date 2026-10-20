@@ -1,7 +1,7 @@
 # PZ Mod Manager - Created by duy64. Licensed under the MIT License (see LICENSE.txt).
 #Requires -Version 5.1
 <#
-  PZ Mod Manager v401 - B42 Essentials: mod pack for Single-Player & Multiplayer
+  PZ Mod Manager v402 - B42 Essentials: mod pack for Single-Player & Multiplayer
   Full collection (~190 mods) + Cheat Menu: Rebuild, no Steam client needed.
 #>
 $ErrorActionPreference = 'Stop'
@@ -17,7 +17,7 @@ $NL          = [Environment]::NewLine
 # Target game build. B43 = change these lines; the layout repair and [10] checks derive from them.
 $GameBuild = '42'      # major build: version folder name (42/)
 $GameBuildFull = '42.21'  # current full build: versionMax floor for [10] warnings
-$ScriptVersion = '401'    # app version: shown in the menu header + GUI title
+$ScriptVersion = '402'    # app version: shown in the menu header + GUI title
 
 # All known categories, including ones with zero mods right now (Maps /
 # Audio / Zombies have no catalog mods yet). The category editor lists
@@ -1073,27 +1073,52 @@ function Save-InstallMap($map) {
 }
 
 function Get-ContentStamp($path) {
-  $max = [int64]0
-  $files = Get-ChildItem $path -Recurse -File -ErrorAction SilentlyContinue
+  # Content-based stamp (NOT mtime): SteamCMD re-downloads change file
+  # mtimes even when content is identical, which made every check report
+  # phantom "updates" for freshly installed mods. This hashes relative
+  # paths + file sizes + content, so identical downloads give identical
+  # stamps regardless of when they were downloaded.
+  try { Add-Type -AssemblyName System.Security -ErrorAction SilentlyContinue } catch { }
+  $sha = [System.Security.Cryptography.SHA256]::Create()
+  $files = @(Get-ChildItem $path -Recurse -File -ErrorAction SilentlyContinue | Sort-Object FullName)
   foreach ($f in $files) {
-    $t = $f.LastWriteTimeUtc.Ticks
-    if ($t -gt $max) { $max = $t }
+    $rel = $f.FullName.Substring($path.Length)
+    $meta = [System.Text.Encoding]::UTF8.GetBytes($rel + '|' + $f.Length + '|')
+    [void]$sha.TransformBlock($meta, 0, $meta.Length, $null, 0)
+    try {
+      $stream = $f.OpenRead()
+      try {
+        $buf = New-Object byte[] 8192
+        while (($read = $stream.Read($buf, 0, $buf.Length)) -gt 0) {
+          [void]$sha.TransformBlock($buf, 0, $read, $null, 0)
+        }
+      } finally { $stream.Close() }
+    } catch { }
   }
-  return $max
+  [void]$sha.TransformFinalBlock([byte[]]@(), 0, 0)
+  $hash = [BitConverter]::ToString($sha.Hash).Replace('-', '')
+  $sha.Dispose()
+  return $hash
 }
 function Get-FoldersStamp($folders) {
   # Stamp over ONLY the mod.info folders (the mod's real content), not
-  # the whole download folder. The download folder can hold junk/temp
-  # files whose mtimes change on every SteamCMD re-download, which made
-  # a mod "have an update" forever even after installing it.
-  # NOTE: this changes the stamp basis - the first check after v226
-  # will list installed mods as updates once (one-time re-baseline).
-  $max = [int64]0
+  # the whole download folder. Combines the per-folder content hashes
+  # into one hash (sorted, so folder order does not matter).
+  # NOTE: stamp basis changed in v402 (mtime -> content hash). The first
+  # check after upgrading will list installed mods as updates once
+  # (one-time re-baseline), then settle.
+  $hashes = @()
   foreach ($f in $folders) {
-    $st = Get-ContentStamp $f.FullName
-    if ($st -gt $max) { $max = $st }
+    $hashes += [string](Get-ContentStamp $f.FullName)
   }
-  return $max
+  $hashes = @($hashes | Sort-Object)
+  $combined = [string]::Join('|', $hashes)
+  try { Add-Type -AssemblyName System.Security -ErrorAction SilentlyContinue } catch { }
+  $sha = [System.Security.Cryptography.SHA256]::Create()
+  $bytes = [System.Text.Encoding]::UTF8.GetBytes($combined)
+  $hash = [BitConverter]::ToString($sha.ComputeHash($bytes)).Replace('-', '')
+  $sha.Dispose()
+  return $hash
 }
 
 function Get-ModInfoId($modInfoPath) {
