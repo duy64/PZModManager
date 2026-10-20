@@ -1,7 +1,7 @@
 # PZ Mod Manager - Created by duy64. Licensed under the MIT License (see LICENSE.txt).
 #Requires -Version 5.1
 <#
-  PZ Mod Manager v443 - B42 Essentials: mod pack for Single-Player & Multiplayer
+  PZ Mod Manager v444 - B42 Essentials: mod pack for Single-Player & Multiplayer
   Full collection (~190 mods) + Cheat Menu: Rebuild, no Steam client needed.
 #>
 $ErrorActionPreference = 'Stop'
@@ -17,7 +17,7 @@ $NL          = [Environment]::NewLine
 # Target game build. B43 = change these lines; the layout repair and [10] checks derive from them.
 $GameBuild = '42'      # major build: version folder name (42/)
 $GameBuildFull = '42.21'  # current full build: versionMax floor for [10] warnings
-$ScriptVersion = '443'    # app version: shown in the menu header + GUI title
+$ScriptVersion = '444'    # app version: shown in the menu header + GUI title
 
 # All known categories, including ones with zero mods right now (Maps /
 # Audio / Zombies have no catalog mods yet). The category editor lists
@@ -1751,6 +1751,8 @@ $DepMap = @{
   '3695874178' = @('3253385114', '3005903549')   # Dynamic Events -> DeLorean DMC-12 + Beetle (its SpecialDynamicEvents module requires their vehicle mods)
   '3717082142' = @('3695874178')   # Chaos Mod / Dynamic Events Special -> Dynamic Events
   '3579088411' = @('3396446795', '3389605231')   # Infirmities -> Moodle Framework + TchernoLib
+  '3253385114' = @('3171167894')   # '81 DeLorean DMC-12 -> that DAMN Library (KI5 framework)
+  '3005903549' = @('3171167894')   # '63 Volkswagen 1300 Beetle -> that DAMN Library
 }
 # ModID -> WorkshopID for generic require= resolution (when a mod needs a dep not in DepMap)
 $ModIdToWorkshop = @{
@@ -1762,6 +1764,7 @@ $ModIdToWorkshop = @{
   'DynamicEvents' = '3695874178'
   'WarThunderVehicleLibrary' = '3399660368'
   'TchernoLib' = '3389605231'
+  'damnlib' = '3171167894'
   '63beetle' = '3005903549'
   '63beetleBuggy' = '3005903549'
   '63beetleHP' = '3005903549'
