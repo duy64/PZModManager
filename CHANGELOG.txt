@@ -1,6 +1,7 @@
 PZ MOD MANAGER - FULL CHANGELOG
 Created by duy64. Licensed under the MIT License (see LICENSE.txt).
 
+v401: Mods tab: swapped rows so Move to sits with the other inputs (Search, ID/URL), and Install/Uninstall sit right above the list.
 v400: Mods tab layout: Install/Uninstall Selected on their own row. Move To Category on its own row with a 'Move to:' label (Width 50) so Search, ID/URL, and Move to text boxes all line up.
 v399: Rating and Subscribers are now standard across the app. New Rating column (Steam positive %) on the Mods tab, sortable. Workshop Search dialog and Packs detail pane now show Subscribers + Rating. Stats cache extended to include vote data (same API call, no extra requests).
 v398: Categories tab is now list-only (detail pane removed). Move To Category moved to the Mods tab: select mods, pick a category from the dropdown, click Move To Category. Fixes v397 startup crash from half-removed detail pane code.
