@@ -1,7 +1,7 @@
 # PZ Mod Manager - Created by duy64. Licensed under the MIT License (see LICENSE.txt).
 #Requires -Version 5.1
 <#
-  PZ Mod Manager v397 - B42 Essentials: mod pack for Single-Player & Multiplayer
+  PZ Mod Manager v398 - B42 Essentials: mod pack for Single-Player & Multiplayer
   Full collection (~190 mods) + Cheat Menu: Rebuild, no Steam client needed.
 #>
 $ErrorActionPreference = 'Stop'
@@ -17,7 +17,7 @@ $NL          = [Environment]::NewLine
 # Target game build. B43 = change these lines; the layout repair and [10] checks derive from them.
 $GameBuild = '42'      # major build: version folder name (42/)
 $GameBuildFull = '42.21'  # current full build: versionMax floor for [10] warnings
-$ScriptVersion = '397'    # app version: shown in the menu header + GUI title
+$ScriptVersion = '398'    # app version: shown in the menu header + GUI title
 
 # All known categories, including ones with zero mods right now (Maps /
 # Audio / Zombies have no catalog mods yet). The category editor lists
@@ -3332,15 +3332,10 @@ function Cycle-GuiCategoriesSort([string]$col) {
 }
 function Update-GuiCategorySelectionButtons {
   # Standard: selection-requiring buttons disabled until the
-  # requirement is met. Delete needs a checked category; the
-  # detail member buttons need checked mods (shared selection).
+  # requirement is met. Delete needs a checked category.
   $nc = 0
   if ($script:GuiSelectedCategories) { $nc = $script:GuiSelectedCategories.Count }
-  $nm = 0
-  if ($script:GuiSelectedMods) { $nm = $script:GuiSelectedMods.Count }
   if ($script:GuiDeleteSelectedCategoriesButton) { $script:GuiDeleteSelectedCategoriesButton.IsEnabled = ($nc -gt 0) }
-  if ($script:GuiMoveSelectedButton) { $script:GuiMoveSelectedButton.IsEnabled = ($nm -gt 0) }
-  if ($script:GuiRemoveSelectedCategoryMembersButton) { $script:GuiRemoveSelectedCategoryMembersButton.IsEnabled = ($nm -gt 0) }
   Sync-GuiHeaderCheckbox $script:GuiCategoryListView 'SelectAllCategories' $script:GuiCategoriesShownNames $script:GuiSelectedCategories
 }
 
@@ -3360,7 +3355,7 @@ function Refresh-GuiCategoriesTab {
     if ($act0 -ne '') { [void](Set-ModsFromNamedList $act0) }
     if (-not $script:GuiSelectedMods) { $script:GuiSelectedMods = @{} }
     if (-not $script:GuiSelectedCategories) { $script:GuiSelectedCategories = @{} }
-    if ($script:GuiMoveSelectedCategoryBox) { $script:GuiMoveSelectedCategoryBox.Items.Clear(); foreach ($cc in @(Get-AllCategoryNames)) { [void]$script:GuiMoveSelectedCategoryBox.Items.Add($cc) } }
+    if ($script:GuiModMoveCategoryBox) { $script:GuiModMoveCategoryBox.Items.Clear(); foreach ($cc in @(Get-AllCategoryNames)) { [void]$script:GuiModMoveCategoryBox.Items.Add($cc) } }
     $installed = @(Get-InstalledWorkshopIds)
     $allNames = @(Get-AllCategoryNames)
     $script:GuiCategoriesTotal = $allNames.Count
@@ -3430,7 +3425,6 @@ function Refresh-GuiCategoriesTab {
     if ($detailName -eq '' -or -not ($shownNames -contains $detailName)) {
       if ($shownNames.Count -gt 0) { $script:GuiCategoryDetailName = [string]$shownNames[0]; $detailName = $script:GuiCategoryDetailName } else { $detailName = '' }
     }
-    if ($detailName -ne '') { Refresh-GuiCategoryDetail $detailName }
     Update-GuiStatusBar
   } finally {
     $script:GuiRefreshingCategoriesTab = $false
@@ -3439,38 +3433,6 @@ function Refresh-GuiCategoriesTab {
 
   Update-GuiCategorySelectionButtons
   Sync-GuiHeaderCheckbox $script:GuiCategoryListView 'SelectAllCategories' $script:GuiCategoriesShownNames $script:GuiSelectedCategories
-}
-
-function Refresh-GuiCategoryDetail([string]$cat) {
-  # Detail table: every mod in $cat, sorted by Name (same columns as the
-  # Packs detail table). Shared mod selection with the Mods tab.
-  if (-not $script:GuiCategoryMemberList) { return }
-  if (-not $script:GuiSelectedMods) { $script:GuiSelectedMods = @{} }
-  $installed = @(Get-InstalledWorkshopIds)
-  $rows = @()
-  foreach ($m in @($Mods | Where-Object { [string]$_.Cat -eq $cat } | Sort-Object Name)) {
-    $rows += [PSCustomObject]@{
-      Name = [string]$m.Name
-      Category = [string]$m.Cat
-      Status = if ($installed -contains [string]$m.WorkshopId) { 'Installed' } else { 'Not installed' }
-      WorkshopId = [string]$m.WorkshopId
-      IsChecked = $script:GuiSelectedMods.ContainsKey([string]$m.WorkshopId)
-    }
-  }
-  $script:GuiCategoryMemberList.ItemsSource = $rows
-  $script:GuiCategoryDetailShown = $rows.Count
-  if ($script:GuiCategoryMemberLabel) { $script:GuiCategoryMemberLabel.Text = ('Mods in ' + $cat + ' (' + $rows.Count + ')') }
-  # Header select-all checkbox.
-  if ($script:GuiCategoryMemberList.View -and $script:GuiCategoryMemberList.View.Columns -and $script:GuiCategoryMemberList.View.Columns.Count -gt 0) {
-    $hdrCb = $script:GuiCategoryMemberList.View.Columns[0].Header
-    if ($hdrCb -is [System.Windows.Controls.CheckBox]) {
-      $selCount = 0
-      foreach ($r in $rows) { if ($r.IsChecked) { $selCount++ } }
-      if ($rows.Count -eq 0 -or $selCount -eq 0) { $hdrCb.IsChecked = $false }
-      elseif ($selCount -eq $rows.Count) { $hdrCb.IsChecked = $true }
-      else { $hdrCb.IsChecked = $false }
-    }
-  }
 }
 
 function Delete-GuiSelectedCategories {
@@ -3492,42 +3454,6 @@ function Delete-GuiSelectedCategories {
   Set-GuiTransientStatus (('Deleted ' + $cats.Count + ' categor(ies).'))
   Refresh-GuiAfterListChange
 }
-function Remove-GuiSelectedCategoryMembers {
-  # Remove the selected mods in the detail category from that category:
-  # they move to Others (the fallback). Only mods actually in the
-  # detail category are removed; ticks from other categories (e.g. via
-  # the Mods tab) are left alone.
-  $cat = [string]$script:GuiCategoryDetailName
-  if ($cat -eq '') { Set-GuiTransientStatus ('Pick a category first.'); return }
-  if ($cat -eq 'Others') { Set-GuiTransientStatus ('These mods are already in Others.'); return }
-  if (-not $script:GuiSelectedMods -or $script:GuiSelectedMods.Count -eq 0) { Set-GuiTransientStatus ('Select some mods in this category first.'); return }
-  $toRemove = @()
-  foreach ($id in @($script:GuiSelectedMods.Keys)) {
-    $m = @($Mods | Where-Object { [string]$_.WorkshopId -eq [string]$id })[0]
-    if (-not $m) { continue }
-    if ([string]$m.Cat -ne $cat) { continue }
-    $toRemove += [string]$id
-  }
-  if ($toRemove.Count -eq 0) { Set-GuiTransientStatus ('No selected mods are in this category.'); return }
-  # Safeguard (standard): confirm before removing from the category.
-  $res = Show-GuiMessageBox ('Remove ' + $toRemove.Count + ' selected mod(s) from category ' + $cat + '? (They move to Others.)') 'PZ Mod Manager' ([System.Windows.MessageBoxButton]::YesNo) ([System.Windows.MessageBoxImage]::Warning)
-  if ($res -ne [System.Windows.MessageBoxResult]::Yes) { return }
-  $n = 0
-  foreach ($id in $toRemove) {
-    $m = @($Mods | Where-Object { [string]$_.WorkshopId -eq [string]$id })[0]
-    if (-not $m) { continue }
-    Save-CustomCategory ([string]$m.WorkshopId) 'Others'
-    Set-StoredModCategory ([string]$m.WorkshopId) 'Others'
-    $m.Cat = 'Others'
-    foreach ($mm in @($script:DefaultBase)) { if ([string]$mm.WorkshopId -eq [string]$m.WorkshopId) { $mm.Cat = 'Others' } }
-    $script:GuiSelectedMods.Remove([string]$id)
-    $n++
-  }
-  # Standard: refresh every view after this change (one composite call).
-  Refresh-GuiAfterListChange
-  Set-GuiTransientStatus (("Removed " + $n + " mod(s) from '" + $cat + "' (moved to Others)."))
-}
-
 function Set-StoredModCategory([string]$workshopId, [string]$cat) {
   # Keep the STORED cat in every named list in sync
   # with a per-mod category change. The Lists tab renders the stored cat
@@ -3776,7 +3702,6 @@ function Update-GuiWorkshopButtons {
   $sel = $null; if ($script:GuiModList) { $sel = $script:GuiModList.SelectedItem }
   if ($script:GuiWorkshopButton) { $script:GuiWorkshopButton.IsEnabled = ($null -ne $sel -and [string]$sel.WorkshopId -match '^\d+$' -and [string]$sel.Name -ne '' -and [string]$sel.Name -ne [string]$sel.WorkshopId) }
   $sel = $null; if ($script:GuiPackMemberList) { $sel = $script:GuiPackMemberList.SelectedItem }
-  $sel = $null; if ($script:GuiCategoryMemberList) { $sel = $script:GuiCategoryMemberList.SelectedItem }
 }
 
 function Update-GuiSelectionButtons {
@@ -3798,6 +3723,7 @@ function Update-GuiSelectionButtons {
   # Workshop, at least one for the rest). Same rule on every tab.
   if ($script:GuiModRemoveFromListButton) { $script:GuiModRemoveFromListButton.IsEnabled = ($n -gt 0) }
   if ($script:GuiVariantsButton) { $script:GuiVariantsButton.IsEnabled = ($n -gt 0) }
+  if ($script:GuiModMoveToCategoryButton) { $script:GuiModMoveToCategoryButton.IsEnabled = ($n -gt 0) }
   Sync-GuiHeaderCheckbox $script:GuiModList 'SelectAll' $script:GuiModsShownIds $script:GuiSelectedMods
 }
 
@@ -3836,21 +3762,6 @@ function Toggle-GuiSelectAllCategories {
   if ($allSelected) { $script:GuiSelectedCategories = @{} } else { foreach ($name in @($script:GuiCategoriesShownNames.Keys)) { $script:GuiSelectedCategories[$name] = $true } }
   Refresh-GuiCategoriesTab
 }
-function Toggle-GuiSelectAllCategoryMembers {
-  # Header checkbox on the Categories detail table: select all mods in
-  # the detail category or clear (shared mod selection with Mods tab).
-  $detailName = [string]$script:GuiCategoryDetailName
-  if ($detailName -eq '') { return }
-  $members = @($Mods | Where-Object { [string]$_.Cat -eq $detailName })
-  if (-not $script:GuiSelectedMods) { $script:GuiSelectedMods = @{} }
-  $allSelected = ($members.Count -gt 0)
-  foreach ($m in $members) { if (-not $script:GuiSelectedMods.ContainsKey([string]$m.WorkshopId)) { $allSelected = $false; break } }
-  if ($allSelected) { foreach ($m in $members) { $script:GuiSelectedMods.Remove([string]$m.WorkshopId) } } else { foreach ($m in $members) { $script:GuiSelectedMods[[string]$m.WorkshopId] = $m.Name } }
-  $script:GuiSelectionDirty = $true
-  Refresh-GuiCategoriesTab
-  Refresh-GuiMods
-}
-
 function Toggle-GuiSelectAllPackMembers {
   # Header checkbox on the Packs detail table: select all members of the
   # detail pack or clear (shared mod selection with the Mods tab).
@@ -5460,7 +5371,6 @@ function Open-GuiWorkshopPage {
   if ($script:GuiTabControl) { $idx = $script:GuiTabControl.SelectedIndex }
   if ($idx -eq 0 -and $script:GuiModList) { $sel = $script:GuiModList.SelectedItem; if ($sel) { $wid = [string]$sel.WorkshopId; $nm = [string]$sel.Name } }
   elseif ($idx -eq 1 -and $script:GuiPackMemberList) { $sel = $script:GuiPackMemberList.SelectedItem; if ($sel) { $wid = [string]$sel.WorkshopId; $nm = [string]$sel.Name } }
-  elseif ($idx -eq 2 -and $script:GuiCategoryMemberList) { $sel = $script:GuiCategoryMemberList.SelectedItem; if ($sel) { $wid = [string]$sel.WorkshopId; $nm = [string]$sel.Name } }
   # A row whose Name is just its Workshop ID is an unresolved entry
   # (a random ID, or added while offline) - there is no real mod
   # page for it. No fallback to the main page here: Browse Workshop
@@ -6564,6 +6474,8 @@ function Show-Gui {
     $script:GuiCategoryBox = $script:GuiWindow.FindName('CategoryBox')
     $script:GuiPackFilterBox = $script:GuiWindow.FindName('PackFilterBox')
     $script:GuiInstallSelectedModsButton = $script:GuiWindow.FindName('InstallSelectedModsButton')
+    $script:GuiModMoveCategoryBox = $script:GuiWindow.FindName('ModMoveCategoryBox')
+    $script:GuiModMoveToCategoryButton = $script:GuiWindow.FindName('ModMoveToCategoryButton')
     $script:GuiUninstallSelectedModsButton = $script:GuiWindow.FindName('UninstallSelectedModsButton')
     $script:GuiListRenameDeleteButton = $script:GuiWindow.FindName('ListRenameDeleteButton')
     $script:GuiSetActiveListButton = $script:GuiWindow.FindName('SetActiveListButton')
@@ -6592,12 +6504,7 @@ function Show-Gui {
     $script:GuiAddCategoryButton = $script:GuiWindow.FindName('AddCategoryButton')
     $script:GuiCategoryListView = $script:GuiWindow.FindName('CategoryListView')
     $script:GuiCategorySearchBox = $script:GuiWindow.FindName('CategorySearchBox')
-    $script:GuiCategoryMemberLabel = $script:GuiWindow.FindName('CategoryMemberLabel')
-    $script:GuiCategoryMemberList = $script:GuiWindow.FindName('CategoryMemberList')
     $script:GuiDeleteSelectedCategoriesButton = $script:GuiWindow.FindName('DeleteSelectedCategoriesButton')
-    $script:GuiRemoveSelectedCategoryMembersButton = $script:GuiWindow.FindName('RemoveSelectedCategoryMembersButton')
-    $script:GuiMoveSelectedCategoryBox = $script:GuiWindow.FindName('MoveSelectedCategoryBox')
-    $script:GuiMoveSelectedButton = $script:GuiWindow.FindName('MoveSelectedButton')
     $script:GuiNewListButton = $script:GuiWindow.FindName('NewListButton')
     $script:GuiImportListButton = $script:GuiWindow.FindName('ImportListButton')
     $script:GuiExportSelectedListButton = $script:GuiWindow.FindName('ExportSelectedListButton')
@@ -6609,7 +6516,6 @@ function Show-Gui {
     Register-LastColumnFill $script:GuiPackMemberList
     Register-LastColumnFill $script:GuiNamedListView
     Register-LastColumnFill $script:GuiCategoryListView
-    Register-LastColumnFill $script:GuiCategoryMemberList
     $script:GuiTabControl = $script:GuiWindow.FindName('MainTabControl')
     $script:GuiStatusText = $script:GuiWindow.FindName('StatusText')
     $script:GuiCategory = 'All categories'
@@ -6829,24 +6735,10 @@ function Show-Gui {
         Refresh-GuiCategoriesTab
       }
     })
-    $script:GuiCategoryMemberList.AddHandler([System.Windows.Controls.Primitives.ButtonBase]::ClickEvent, [System.Windows.RoutedEventHandler]{
-      $src = $args[1].OriginalSource
-      if ($src -is [System.Windows.Controls.CheckBox]) {
-        if ([string]$src.Tag -eq 'SelectAllCategoryMembers') { Toggle-GuiSelectAllCategoryMembers }
-        else {
-          $item = $src.DataContext
-          if ($item -and [string]$item.WorkshopId -ne '') {
-            if (-not $script:GuiSelectedMods) { $script:GuiSelectedMods = @{} }
-            if ($src.IsChecked) { $script:GuiSelectedMods[[string]$item.WorkshopId] = [string]$item.Name } else { $script:GuiSelectedMods.Remove([string]$item.WorkshopId) }
-            $script:GuiSelectionDirty = $true
-            Update-GuiCategorySelectionButtons
-                    }
-        }
-      }
-    })
-    $script:GuiCategoryMemberList.Add_SelectionChanged({ Update-GuiWorkshopButtons })
+
     $script:GuiInstallSelectedModsButton.Add_Click({ Install-GuiSelectedMods })
     $script:GuiUninstallSelectedModsButton.Add_Click({ Uninstall-GuiSelectedMods })
+    $script:GuiModMoveToCategoryButton.Add_Click({ Move-GuiSelectedMods })
     $script:GuiPackMemberAddButton.Add_Click({ $typed = [string]$script:GuiPackMemberIdBox.Text; if ($typed.Trim() -ne '') { $entries = @(Parse-ModIdsFromText $typed); if ($entries.Count -gt 0) { $valid = @($entries | Where-Object { [bool]$_.Valid }); $rejected = @($entries | Where-Object { -not [bool]$_.Valid }); if ($valid.Count -gt 0) { Add-GuiPackMembers $script:GuiPackDetailName $valid }; if ($rejected.Count -gt 0) { Show-GuiRejectedWorkshopIds $rejected }; $script:GuiPackMemberIdBox.Text = '' } else { Set-GuiTransientStatus ('No valid Workshop ID found.') } } else { Set-GuiTransientStatus ('Enter an ID/URL.') } })
     $script:GuiPackMemberAddFromListButton.Add_Click({ $pk = $script:GuiPackDetailName; if ($pk -eq '') { Set-GuiTransientStatus ('Pick a pack first.'); return }; $res = Show-GuiAddFromListPicker $pk; if ($res.Failed) { Set-GuiTransientStatus ('Could not open the picker: ' + [string]$script:LastPickerError); return }; $picked = @($res.Selected); if ($picked.Count -eq 0) { if ($res.NoCandidates) { Set-GuiTransientStatus ('Nothing to add - all list mods are already in this pack.'); } else { Set-GuiTransientStatus ('Add from list cancelled.'); }; return }; Add-GuiPackMembers $pk $picked })
     $script:GuiPackMemberRemoveButton.Add_Click({ Remove-GuiSelectedPackMembers })
@@ -6879,7 +6771,7 @@ function Show-Gui {
     $script:GuiPackRenameDeleteButton.Add_Click({ $script:GuiPackRenameDeleteButton.ContextMenu.IsOpen = $true })
     $script:GuiPackResetButton.Add_Click({ Reset-GuiCustomPack $script:GuiPackDetailName })
     $script:GuiDeleteSelectedCategoriesButton.Add_Click({ Delete-GuiSelectedCategories })
-    $script:GuiRemoveSelectedCategoryMembersButton.Add_Click({ Remove-GuiSelectedCategoryMembers })
+
     $script:GuiListRenameDeleteMenu = New-Object System.Windows.Controls.ContextMenu
     $script:GuiListRenameDeleteRenameItem = New-Object System.Windows.Controls.MenuItem
     $script:GuiListRenameDeleteRenameItem.Header = 'Rename Selected...'
@@ -6928,7 +6820,7 @@ function Show-Gui {
     })
     $script:GuiNewPackButton.Add_Click({ New-GuiCustomPack })
     $script:GuiAddCategoryButton.Add_Click({ Add-GuiCategory })
-    $script:GuiMoveSelectedButton.Add_Click({ Move-GuiSelectedMods })
+
 
     # Final button-state pass: the startup refresh ran before some
     # buttons were wired (View on Workshop), so re-apply the
