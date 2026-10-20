@@ -1,7 +1,7 @@
 # PZ Mod Manager - Created by duy64. Licensed under the MIT License (see LICENSE.txt).
 #Requires -Version 5.1
 <#
-  PZ Mod Manager v422 - B42 Essentials: mod pack for Single-Player & Multiplayer
+  PZ Mod Manager v423 - B42 Essentials: mod pack for Single-Player & Multiplayer
   Full collection (~190 mods) + Cheat Menu: Rebuild, no Steam client needed.
 #>
 $ErrorActionPreference = 'Stop'
@@ -17,7 +17,7 @@ $NL          = [Environment]::NewLine
 # Target game build. B43 = change these lines; the layout repair and [10] checks derive from them.
 $GameBuild = '42'      # major build: version folder name (42/)
 $GameBuildFull = '42.21'  # current full build: versionMax floor for [10] warnings
-$ScriptVersion = '422'    # app version: shown in the menu header + GUI title
+$ScriptVersion = '423'    # app version: shown in the menu header + GUI title
 
 # All known categories, including ones with zero mods right now (Maps /
 # Audio / Zombies have no catalog mods yet). The category editor lists
@@ -1469,9 +1469,7 @@ function Show-GuiConsolidatedVariantPicker($pendingMods) {
       <ListView.View><GridView x:Name="ConVariantsGridView" AllowsColumnReorder="False"/></ListView.View>
     </ListView>
     <Border Grid.Row="3" BorderBrush="Gray" BorderThickness="1" Margin="0,8,0,0" MaxHeight="80">
-      <ScrollViewer VerticalScrollBarVisibility="Auto">
-        <TextBlock x:Name="ConDetail" TextWrapping="Wrap" Margin="4" Text="Click a version below to read its full description here."/>
-      </ScrollViewer>
+      <TextBox x:Name="ConDetail" TextWrapping="Wrap" Margin="4" IsReadOnly="True" BorderThickness="0" Background="Transparent" VerticalScrollBarVisibility="Auto" Text="Click a version below to read its full description here."/>
     </Border>
     <StackPanel Grid.Row="4" Orientation="Horizontal" Margin="0,8,0,0">
       <Button x:Name="ConSelectAll" Content="Select All Versions" Padding="12,4" Margin="0,0,8,0"/>
@@ -2850,9 +2848,7 @@ function Show-GuiWpfPicker([string]$title, [string]$instruction, $candidates, $c
       <ListView.View><GridView x:Name="PickerGridView" AllowsColumnReorder="False"/></ListView.View>
     </ListView>
     <Border Grid.Row="3" BorderBrush="Gray" BorderThickness="1" Margin="0,8,0,0" MaxHeight="80">
-      <ScrollViewer VerticalScrollBarVisibility="Auto">
-        <TextBlock x:Name="PickerDetail" TextWrapping="Wrap" Margin="4" Text="Click a row to read its full details here."/>
-      </ScrollViewer>
+      <TextBox x:Name="PickerDetail" TextWrapping="Wrap" Margin="4" IsReadOnly="True" BorderThickness="0" Background="Transparent" VerticalScrollBarVisibility="Auto" Text="Click a row to read its full details here."/>
     </Border>
     <StackPanel Grid.Row="4" Orientation="Horizontal" Margin="0,8,0,0">
       <Button x:Name="PickerWorkshop" Content="View Mod's Page" Padding="12,4" Margin="0,0,8,0"/>
@@ -4984,9 +4980,7 @@ function Show-GuiCompatibilityReport($rows) {
       <ListView.View><GridView x:Name="ReportGridView" AllowsColumnReorder="False"/></ListView.View>
     </ListView>
     <Border Grid.Row="4" BorderBrush="Gray" BorderThickness="1" Margin="0,8,0,0" MaxHeight="80">
-      <ScrollViewer VerticalScrollBarVisibility="Auto">
-        <TextBlock x:Name="ReportDetail" TextWrapping="Wrap" Margin="4" Text="Click a row to read its full details here."/>
-      </ScrollViewer>
+      <TextBox x:Name="ReportDetail" TextWrapping="Wrap" Margin="4" IsReadOnly="True" BorderThickness="0" Background="Transparent" VerticalScrollBarVisibility="Auto" Text="Click a row to read its full details here."/>
     </Border>
     <StackPanel Grid.Row="5" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,8,0,0">
       <Button x:Name="ReportFixDeps" Content="Find And Add Missing Dependencies" Padding="12,4" Margin="0,0,8,0"/>
