@@ -1,6 +1,7 @@
 PZ MOD MANAGER - FULL CHANGELOG
 Created by duy64. Licensed under the MIT License (see LICENSE.txt).
 
+v425: Fixed the search crash (app closed with 'You cannot call a method on a null-valued expression' when typing in a search box): the debounce timer's tick handler did not capture its timer variable, so it fired with a null timer. The handler now uses a closure. Reproduced and verified outside the GUI before shipping.
 v424: Search boxes can no longer crash the app: the debounced search actions now catch errors, log the full record (including the exact failing line) to gui-error.txt, and keep the app running. Includes the v423 copyable detail panes.
 v423: Detail panes in the picker, the consolidated version picker, and the Compatibility Report are now read-only text boxes, so the text (reasons, missing dependency names, Workshop IDs) can be selected and copied for lookup.
 v422: Fixed a crash when installing a mod that failed the pre-install compatibility check: the consolidated picker candidates were built with an 'if' used as an expression, which PowerShell rejects at runtime (the whole app closed). The full stack trace written by v421 pinpointed it; the pattern is now also banned by the build checker. The gui-error.txt diagnostic stays in.

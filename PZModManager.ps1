@@ -1,7 +1,7 @@
 # PZ Mod Manager - Created by duy64. Licensed under the MIT License (see LICENSE.txt).
 #Requires -Version 5.1
 <#
-  PZ Mod Manager v424 - B42 Essentials: mod pack for Single-Player & Multiplayer
+  PZ Mod Manager v425 - B42 Essentials: mod pack for Single-Player & Multiplayer
   Full collection (~190 mods) + Cheat Menu: Rebuild, no Steam client needed.
 #>
 $ErrorActionPreference = 'Stop'
@@ -17,7 +17,7 @@ $NL          = [Environment]::NewLine
 # Target game build. B43 = change these lines; the layout repair and [10] checks derive from them.
 $GameBuild = '42'      # major build: version folder name (42/)
 $GameBuildFull = '42.21'  # current full build: versionMax floor for [10] warnings
-$ScriptVersion = '424'    # app version: shown in the menu header + GUI title
+$ScriptVersion = '425'    # app version: shown in the menu header + GUI title
 
 # All known categories, including ones with zero mods right now (Maps /
 # Audio / Zombies have no catalog mods yet). The category editor lists
@@ -5464,7 +5464,11 @@ function New-GuiDebounce($milliseconds, [scriptblock]$action) {
   # (list rebuild + sort + stats) on every keystroke.
   $timer = New-Object System.Windows.Threading.DispatcherTimer
   $timer.Interval = [TimeSpan]::FromMilliseconds($milliseconds)
-  $timer.Add_Tick({ $timer.Stop(); & $action })
+  # The tick handler MUST capture $timer/$action (GetNewClosure):
+  # without it $timer is $null when the tick fires (the function has
+  # returned), and $timer.Stop() throws 'method on a null-valued
+  # expression' - the v424 search crash.
+  $timer.Add_Tick(({ $timer.Stop(); & $action }).GetNewClosure())
   return { param() $timer.Stop(); $timer.Start() }.GetNewClosure()
 }
 
