@@ -1,7 +1,7 @@
 # PZ Mod Manager - Created by duy64. Licensed under the MIT License (see LICENSE.txt).
 #Requires -Version 5.1
 <#
-  PZ Mod Manager v435 - B42 Essentials: mod pack for Single-Player & Multiplayer
+  PZ Mod Manager v436 - B42 Essentials: mod pack for Single-Player & Multiplayer
   Full collection (~190 mods) + Cheat Menu: Rebuild, no Steam client needed.
 #>
 $ErrorActionPreference = 'Stop'
@@ -17,7 +17,7 @@ $NL          = [Environment]::NewLine
 # Target game build. B43 = change these lines; the layout repair and [10] checks derive from them.
 $GameBuild = '42'      # major build: version folder name (42/)
 $GameBuildFull = '42.21'  # current full build: versionMax floor for [10] warnings
-$ScriptVersion = '435'    # app version: shown in the menu header + GUI title
+$ScriptVersion = '436'    # app version: shown in the menu header + GUI title
 
 # All known categories, including ones with zero mods right now (Maps /
 # Audio / Zombies have no catalog mods yet). The category editor lists
@@ -5819,13 +5819,27 @@ function Manage-GuiModVariants {
     if ($verDirs.Count -gt 0) { $effDirs = $verDirs }
     if ($effDirs.Count -le 1) { continue }
     if (Test-VariantFamily $effDirs) { continue }
+    # A mod whose saved choice already covers every current version
+    # is settled: it leaves this list until Reset All Variant
+    # Choices clears the choice, or a new version appears that the
+    # saved choice does not cover.
+    $storedC = $null
+    if ($prop.Value.PSObject.Properties['variants']) { $storedC = @($prop.Value.variants | ForEach-Object { [string]$_ }) }
+    if ($storedC -and $storedC.Count -gt 0) {
+      $uncovered = $false
+      foreach ($ed in $effDirs) {
+        $eid = Get-ModInfoId (Join-Path $ed.FullName 'mod.info')
+        if ($eid -ne '' -and $storedC -notcontains $eid) { $uncovered = $true; break }
+      }
+      if (-not $uncovered) { continue }
+    }
     $cName = $cid
     $cfm = @($Mods | Where-Object { [string]$_.WorkshopId -eq $cid })[0]
     if ($cfm) { $cName = [string]$cfm.Name }
     $candidates += [PSCustomObject]@{ Name = $cName; WorkshopId = $cid; VariantCount = $cdirs.Count }
   }
   if ($candidates.Count -eq 0) { Set-GuiTransientStatus ('No installed mods have multiple variants to manage.'); return }
-  $pick = Show-GuiWpfPicker 'Manage Variants' 'Select the mod(s) whose variants you want to revise.' $candidates @(
+  $pick = Show-GuiWpfPicker 'Manage Variants' 'Select the mod(s) to choose versions for. A mod leaves this list once its choice is saved; Reset All Variant Choices makes every mod ask again.' $candidates @(
     @{ Header = 'Name'; Property = 'Name'; Width = 500 },
     @{ Header = 'Variants'; Property = 'VariantCount'; Width = 100 },
     @{ Header = 'Workshop ID'; Property = 'WorkshopId'; Width = 150 }
