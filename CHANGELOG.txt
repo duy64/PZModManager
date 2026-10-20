@@ -1,6 +1,7 @@
 PZ MOD MANAGER - FULL CHANGELOG
 Created by duy64. Licensed under the MIT License (see LICENSE.txt).
 
+v408: Fixed star ratings showing blank - the ratings merge into the stats was a silent no-op in v406/v407 (edit never landed). Ratings now display.
 v407: Pack detail member table now has click-to-sort on all columns (Name, Category, Status, Subscribers, Rating, Workshop ID) with sort indicators.
 v406: Packs tab: removed the empty Created Date column (built-in packs have no date). Rating is now 1-5 stars (scraped from Workshop pages, cached weekly, fetched in background so the app stays responsive) instead of a percentage. Steam's API does not provide ratings - the 0% in v399-v405 was a wrong assumption, fixed.
 v405: Packs tab: Description is now the last fill column (was fixed-width and truncated). Column order: Name, Mods, Created Date, Installed, Description. Also fixes Created Date not being sortable (was mapped to Installed sort).
