@@ -1,7 +1,7 @@
 # PZ Mod Manager - Created by duy64. Licensed under the MIT License (see LICENSE.txt).
 #Requires -Version 5.1
 <#
-  PZ Mod Manager v461 - B42 Essentials: mod pack for Single-Player & Multiplayer
+  PZ Mod Manager v462 - B42 Essentials: mod pack for Single-Player & Multiplayer
   Full collection (~190 mods) + Cheat Menu: Rebuild, no Steam client needed.
 #>
 $ErrorActionPreference = 'Stop'
@@ -17,7 +17,7 @@ $NL          = [Environment]::NewLine
 # Target game build. B43 = change these lines; the layout repair and [10] checks derive from them.
 $GameBuild = '42'      # major build: version folder name (42/)
 $GameBuildFull = '42.21'  # current full build: versionMax floor for [10] warnings
-$ScriptVersion = '461'    # app version: shown in the menu header + GUI title
+$ScriptVersion = '462'    # app version: shown in the menu header + GUI title
 
 # All known categories, including ones with zero mods right now (Maps /
 # Audio / Zombies have no catalog mods yet). The category editor lists
@@ -1897,10 +1897,12 @@ function Test-PreInstallCompatible([string]$WorkshopId, [string]$Name, $keptDirs
   # not be reported as missing dependencies.
   $ownIds = @{}
   foreach ($dir in @($keptDirs)) {
+    if (Test-ForeignBuildFolder $dir.Name) { continue }
     $oid = Get-ModInfoId (Join-Path $dir.FullName 'mod.info')
     if ($oid) { $ownIds[$oid] = $true }
   }
   foreach ($dir in @($keptDirs)) {
+    if (Test-ForeignBuildFolder $dir.Name) { continue }
     $miPath = Join-Path $dir.FullName 'mod.info'
     $fid = Get-ModInfoId $miPath
     $prefix = ''
@@ -2047,6 +2049,34 @@ function Test-RequireSatisfiedOnDisk([string]$rid, $diskIds, $ownIds) {
       if ($diskIds -and $diskIds.ContainsKey($alt)) { return $true }
     }
   }
+  return $false
+}
+function Get-BuildFolderRank([string]$miPath) {
+  # Which mod.info the game would load when several copies of
+  # one module sit under one installed folder: the exact build
+  # folder first, then the build-line folder, common, the
+  # folder root, other same-line version folders, ordinary
+  # subfolders, and foreign build lines (B41 on B42) last.
+  $dir = Split-Path $miPath -Parent
+  if (-not $dir) { return 3 }
+  $rel = ''
+  try { $rel = $dir.Substring($ModsDir.Length).TrimStart('\','/') } catch { $rel = '' }
+  $segs = @($rel -split '[\\/]' | Where-Object { $_ -ne '' })
+  if ($segs.Count -le 1) { return 3 }
+  $tag = [string]$segs[1]
+  if ($tag -ieq 'common') { return 2 }
+  if ($tag -match '^(?i)b?(\d{2})(\.\d+){0,2}$') {
+    if ([int]$Matches[1] -ne [int]$GameBuild) { return 6 }
+    if ($tag -ieq $GameBuildFull) { return 0 }
+    if ($tag -ieq $GameBuild) { return 1 }
+    return 4
+  }
+  return 5
+}
+function Test-ForeignBuildFolder([string]$folderName) {
+  # True when a folder name is a build tag for another build
+  # line (a '41' or 'B41' folder while the game is B42).
+  if ($folderName -match '^(?i)b?(\d{2})(\.\d+){0,2}$') { return ([int]$Matches[1] -ne [int]$GameBuild) }
   return $false
 }
 function Get-SafeFolderName([string]$n) {
@@ -5247,18 +5277,42 @@ function Get-CompatibilityReport {
   if (-not (Test-Path $ModsDir)) { return $rows }
   $allInfo = @(Get-ChildItem $ModsDir -Recurse -Filter 'mod.info' -ErrorAction SilentlyContinue | Where-Object { -not $_.PSIsContainer })
   $topToInfos = @{}
-  $diskModIds = @{}
-  $modIdToInfos = @{}
+  $infoIds = @{}
   foreach ($mi in $allInfo) {
     $rel = $mi.FullName.Substring($ModsDir.Length).TrimStart('\','/')
     $top = ($rel -split '[\\/]')[0]
     if (-not $topToInfos.ContainsKey($top)) { $topToInfos[$top] = @() }
     $topToInfos[$top] += $mi.FullName
-    $mid = Get-ModInfoId $mi.FullName
-    if ($mid) {
+    $infoIds[$mi.FullName] = Get-ModInfoId $mi.FullName
+  }
+  # The game loads ONE variant of each module: the mod.info in
+  # the best-matching build folder. Other copies (the B41
+  # variant, an older same-line variant) are never loaded, so
+  # only the effective copy is checked below and only its ID
+  # counts as installed. (The B41 copy of the VVA SVU patch
+  # requires the B41 SVU ID and flagged the whole mod on B42.)
+  $effectiveInfos = @{}
+  foreach ($top in @($topToInfos.Keys)) {
+    $byId = @{}
+    foreach ($p in @($topToInfos[$top])) {
+      $k = [string]$infoIds[$p]
+      if ($k -eq '') { $k = $p }
+      if (-not $byId.ContainsKey($k)) { $byId[$k] = @() }
+      $byId[$k] += $p
+    }
+    foreach ($k in @($byId.Keys)) {
+      $best = @($byId[$k] | Sort-Object { Get-BuildFolderRank $_ }, { $_.Length } | Select-Object -First 1)[0]
+      $effectiveInfos[$best] = $true
+    }
+  }
+  $diskModIds = @{}
+  $modIdToInfos = @{}
+  foreach ($p in @($effectiveInfos.Keys)) {
+    $mid = [string]$infoIds[$p]
+    if ($mid -ne '') {
       $diskModIds[$mid] = $true
       if (-not $modIdToInfos.ContainsKey($mid)) { $modIdToInfos[$mid] = @() }
-      $modIdToInfos[$mid] += $mi.FullName
+      $modIdToInfos[$mid] += $p
     }
   }
   $widToModId = @{}
@@ -5327,6 +5381,7 @@ function Get-CompatibilityReport {
     $blocked = @(); $notes = @(); $missingDeps = @()
     $multi = ($myInfos.Count -gt 1)
     foreach ($miPath in $myInfos) {
+      if (-not $effectiveInfos.ContainsKey($miPath)) { continue }
       $raw = ''
       try { $raw = Get-Content $miPath -Raw -ErrorAction Stop } catch { }
       $fid = Get-ModInfoId $miPath
