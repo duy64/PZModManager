@@ -1,7 +1,7 @@
 # PZ Mod Manager - Created by duy64. Licensed under the MIT License (see LICENSE.txt).
 #Requires -Version 5.1
 <#
-  PZ Mod Manager v457 - B42 Essentials: mod pack for Single-Player & Multiplayer
+  PZ Mod Manager v458 - B42 Essentials: mod pack for Single-Player & Multiplayer
   Full collection (~190 mods) + Cheat Menu: Rebuild, no Steam client needed.
 #>
 $ErrorActionPreference = 'Stop'
@@ -17,7 +17,7 @@ $NL          = [Environment]::NewLine
 # Target game build. B43 = change these lines; the layout repair and [10] checks derive from them.
 $GameBuild = '42'      # major build: version folder name (42/)
 $GameBuildFull = '42.21'  # current full build: versionMax floor for [10] warnings
-$ScriptVersion = '457'    # app version: shown in the menu header + GUI title
+$ScriptVersion = '458'    # app version: shown in the menu header + GUI title
 
 # All known categories, including ones with zero mods right now (Maps /
 # Audio / Zombies have no catalog mods yet). The category editor lists
@@ -1050,6 +1050,20 @@ function Get-InstallMap {
 }
 
 function Save-InstallMap($map) {
+  # Anti-wipe guard: never overwrite a map file that holds real
+  # entries with an empty map. A v457 repair block emptied the
+  # map object in memory and this save then wiped every record
+  # (the mods themselves stayed on disk). An empty map over a
+  # non-empty file is always a bug, never a user action:
+  # uninstalling keeps the entry, marked installed = false.
+  if ($map) {
+    $newCount = @($map.PSObject.Properties | Where-Object { [string]$_.Name -match '^\d+$' }).Count
+    if ($newCount -eq 0 -and (Test-Path $MapPath)) {
+      $oldCount = 0
+      try { $oldMap = Get-Content $MapPath -Raw | ConvertFrom-Json; if ($oldMap) { $oldCount = @($oldMap.PSObject.Properties | Where-Object { [string]$_.Name -match '^\d+$' }).Count } } catch { $oldCount = 0 }
+      if ($oldCount -gt 0) { return }
+    }
+  }
   $map | ConvertTo-Json -Depth 5 | Set-Content $MapPath -Encoding UTF8
 }
 
@@ -2690,13 +2704,6 @@ function Repair-InstallRecords {
   $map = Get-InstallMap
   if (-not $map) { $map = New-Object PSObject }
   $dirty = $false
-  # Remove garbage keys written by the cast-in-argument bug (a
-  # stringified pending object, '[string]@{WorkshopId=...', used
-  # as the map key by deferred completions). The real records
-  # live under the numeric Workshop IDs.
-  foreach ($prop in @($map.PSObject.Properties)) {
-    if ([string]$prop.Name.StartsWith('[string]@{')) { $map.PSObject.Properties.Remove([string]$prop.Name); $dirty = $true }
-  }
   $nameOf = @{}
   foreach ($m in @($script:Mods)) { $nameOf[[string]$m.WorkshopId] = [string]$m.Name }
   $check = @{}
