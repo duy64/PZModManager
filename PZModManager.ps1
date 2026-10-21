@@ -1,7 +1,7 @@
 # PZ Mod Manager - Created by duy64. Licensed under the MIT License (see LICENSE.txt).
 #Requires -Version 5.1
 <#
-  PZ Mod Manager v444 - B42 Essentials: mod pack for Single-Player & Multiplayer
+  PZ Mod Manager v445 - B42 Essentials: mod pack for Single-Player & Multiplayer
   Full collection (~190 mods) + Cheat Menu: Rebuild, no Steam client needed.
 #>
 $ErrorActionPreference = 'Stop'
@@ -17,7 +17,7 @@ $NL          = [Environment]::NewLine
 # Target game build. B43 = change these lines; the layout repair and [10] checks derive from them.
 $GameBuild = '42'      # major build: version folder name (42/)
 $GameBuildFull = '42.21'  # current full build: versionMax floor for [10] warnings
-$ScriptVersion = '444'    # app version: shown in the menu header + GUI title
+$ScriptVersion = '445'    # app version: shown in the menu header + GUI title
 
 # All known categories, including ones with zero mods right now (Maps /
 # Audio / Zombies have no catalog mods yet). The category editor lists
@@ -1873,6 +1873,24 @@ function Test-PreInstallCompatible([string]$WorkshopId, [string]$Name, $keptDirs
   return @{ Compatible = ($blocked.Count -eq 0); Reasons = $blocked; WillInstallDeps = $willInstallDeps }
 }
 
+function Get-LongPath([string]$p) {
+  # Windows MAX_PATH (260) guard: prefixing a local absolute path
+  # with \\?\ makes the Win32 file APIs accept long paths. Mod
+  # folder trees can nest deeply (maps, vehicle packs), and the
+  # SteamCMD cache prefix is already long, so plain paths overflow
+  # 260 and throw PathTooLongException (gui-error 2026-10-20).
+  if ($p -match '^[A-Za-z]:\\' -and $p -notlike '\\?\*') { return ('\\?\' + $p) }
+  return $p
+}
+function Remove-ModFolder([string]$p) {
+  if (-not (Test-Path $p)) { return }
+  try { [IO.Directory]::Delete((Get-LongPath $p), $true) }
+  catch { Remove-Item $p -Recurse -Force -ErrorAction SilentlyContinue }
+}
+function Copy-ModFolder([string]$srcP, [string]$dstP) {
+  Copy-Item (Get-LongPath $srcP) (Get-LongPath $dstP) -Recurse -Force
+}
+
 function Complete-InstallModCore([string]$WorkshopId, [string]$Name, $keptDirs, $carryVariants, $droppedIds, $prop0, [string]$src, [switch]$SkipPreCheck) {
   # Shared tail of an install (used by Install-Mod AND by the
   # deferred path after the consolidated picker decides): dropped-
@@ -1911,7 +1929,7 @@ function Complete-InstallModCore([string]$WorkshopId, [string]$Name, $keptDirs, 
       $eMi = Join-Path (Join-Path $ModsDir ([string]$ef)) 'mod.info'
       if (@($droppedIds) -contains (Get-ModInfoId $eMi)) {
         $ed = Join-Path $ModsDir ([string]$ef)
-        if (Test-Path $ed) { Remove-Item $ed -Recurse -Force -ErrorAction SilentlyContinue }
+        Remove-ModFolder $ed
         Write-Host ("  Removed dropped variant folder: " + $ef) -ForegroundColor DarkGray
       }
     }
@@ -1928,7 +1946,7 @@ function Complete-InstallModCore([string]$WorkshopId, [string]$Name, $keptDirs, 
     if ($usedNames.ContainsKey($dirName)) { $dirName = ($dirName + '_' + $m.Name) }
     $usedNames[$dirName] = $true
     $dest = Join-Path $ModsDir $dirName
-    if (Test-Path $dest) { Remove-Item $dest -Recurse -Force }
+    if (Test-Path $dest) { Remove-ModFolder $dest }
     $isVerFolder = $m.Name -match '^(?i)(\d{2}(\.\d+)?)$'
     $isCommonFolder = $m.Name -match '^(?i)common$'
     if ($isVerFolder -or $isCommonFolder) {
@@ -1938,12 +1956,12 @@ function Complete-InstallModCore([string]$WorkshopId, [string]$Name, $keptDirs, 
       # (dropping real common/ content). For Java mods like Viewpoint that drops
       # the JAR in 42/, so the game cannot load the mod and never lists it.
       $parent = $m.Parent
-      [void](Copy-Item $parent.FullName $dest -Recurse -Force)
+      [void](Copy-ModFolder $parent.FullName $dest)
       $rootInfo = Join-Path $dest 'mod.info'
       if (-not (Test-Path $rootInfo)) { Copy-Item (Join-Path $m.FullName 'mod.info') $rootInfo -Force }
       Write-Host ("  Installed (B" + $GameBuild + " layout, kept common/ + version folders): " + $dirName) -ForegroundColor DarkGray
     } else {
-      Copy-Item $m.FullName $dest -Recurse -Force
+      Copy-ModFolder $m.FullName $dest
       Write-Host ("  Installed: " + $dirName) -ForegroundColor DarkGray
     }
     if (-not (Test-Path (Join-Path $dest 'mod.info'))) {
@@ -2731,14 +2749,14 @@ function Install-FoundUpdates($updates, $map) {
       if ($usedNames.ContainsKey($dirName)) { $dirName = ($dirName + '_' + $f.Name) }
       $usedNames[$dirName] = $true
       $dest = Join-Path $ModsDir $dirName
-      if (Test-Path $dest) { Remove-Item $dest -Recurse -Force }
+      if (Test-Path $dest) { Remove-ModFolder $dest }
       $isVerFolder = $f.Name -match '^(?i)(\d{2}(\.\d+)?)$'
       $isCommonFolder = $f.Name -match '^(?i)common$'
       if ($isVerFolder -or $isCommonFolder) {
         # Mod lives in a versioned/common subfolder: the mod root is the PARENT.
         # Copy the WHOLE parent so common/ + version folders survive intact.
         $parent = $f.Parent
-        [void](Copy-Item $parent.FullName $dest -Recurse -Force)
+        [void](Copy-ModFolder $parent.FullName $dest)
         $rootInfo = Join-Path $dest 'mod.info'
         if (-not (Test-Path $rootInfo)) { [void](Copy-Item (Join-Path $f.FullName 'mod.info') $rootInfo -Force) }
         Write-Host ("  Updated (B" + $GameBuild + " layout, kept common/ + version folders): " + $dirName) -ForegroundColor DarkGray
@@ -5734,7 +5752,8 @@ function Install-GuiSelectedMods {
   foreach ($m in @($Mods | Where-Object { $ids -contains [string]$_.WorkshopId })) {
     $inMods[[string]$m.WorkshopId] = $true
     $n++; Show-GuiInstallProgress $n $ids.Count $m.Name $start 'Installing'
-    $r = Install-Mod $m.WorkshopId $m.Name
+    $r = $false
+    try { $r = Install-Mod $m.WorkshopId $m.Name } catch { Write-GuiErrorDump $_ ('InstallMod ' + [string]$m.WorkshopId) }
     if ($r -eq $true) { $ok++ }
     if ($script:AbortVariantBatch) { break }
   }
@@ -5742,7 +5761,7 @@ function Install-GuiSelectedMods {
   # still install, using the stored name.
   foreach ($id in $ids) {
     if ($script:AbortVariantBatch) { break }
-    if (-not $inMods.ContainsKey($id)) { $n++; Show-GuiInstallProgress $n $ids.Count $script:GuiSelectedMods[$id] $start 'Installing'; $r2 = Install-Mod $id $script:GuiSelectedMods[$id]; if ($r2 -eq $true) { $ok++ } }
+    if (-not $inMods.ContainsKey($id)) { $n++; Show-GuiInstallProgress $n $ids.Count $script:GuiSelectedMods[$id] $start 'Installing'; $r2 = $false; try { $r2 = Install-Mod $id $script:GuiSelectedMods[$id] } catch { Write-GuiErrorDump $_ ('InstallMod ' + [string]$id) }; if ($r2 -eq $true) { $ok++ } }
   }
   # Consolidated picker: decide ALL deferred multi-variant mods at once.
   # Batch mode is OFF for the complete phase (its dependency installs
@@ -5761,7 +5780,9 @@ function Install-GuiSelectedMods {
         $dec = $conRes.Decisions[[string]$pd.WorkshopId]
         if (-not $dec) { $dec = @{ KeptIndices = @(0..(@($pd.VariantDirs).Count - 1)); KeptIds = @($pd.Candidates | ForEach-Object { [string]$_.WorkshopId }) } }
         if ($dec -and @($dec.KeptIndices).Count -eq 0) { $script:BatchUserSkipped += [string]$pd.WorkshopId }
-        if ((Complete-DeferredInstall $pd $dec) -eq $true) { $ok++ }
+        $cdi = $false
+        try { $cdi = Complete-DeferredInstall $pd $dec } catch { Write-GuiErrorDump $_ ('CompleteDeferred ' + [string]$pd.WorkshopId) }
+        if ($cdi -eq $true) { $ok++ }
       }
     }
   }
@@ -5785,7 +5806,9 @@ function Install-GuiSelectedMods {
     if (-not $pcRes.Failed -and $pcRes.Selected) {
       foreach ($sel in @($pcRes.Selected)) {
         $pf = @($preFailed | Where-Object { [string]$_.WorkshopId -eq [string]$sel.WorkshopId })[0]
-        if ($pf -and (Complete-InstallModCore [string]$pf.WorkshopId [string]$pf.Name @($pf.KeptDirs) @($pf.CarryVariants) @($pf.DroppedIds) $pf.Prop0 [string]$pf.Src -SkipPreCheck) -eq $true) { $ok++ }
+        $cic = $false
+        if ($pf) { try { $cic = Complete-InstallModCore [string]$pf.WorkshopId [string]$pf.Name @($pf.KeptDirs) @($pf.CarryVariants) @($pf.DroppedIds) $pf.Prop0 [string]$pf.Src -SkipPreCheck } catch { Write-GuiErrorDump $_ ('CompletePreCheck ' + [string]$pf.WorkshopId) } }
+        if ($cic -eq $true) { $ok++ }
       }
     }
   }
