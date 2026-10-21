@@ -1,7 +1,7 @@
 # PZ Mod Manager - Created by duy64. Licensed under the MIT License (see LICENSE.txt).
 #Requires -Version 5.1
 <#
-  PZ Mod Manager v455 - B42 Essentials: mod pack for Single-Player & Multiplayer
+  PZ Mod Manager v456 - B42 Essentials: mod pack for Single-Player & Multiplayer
   Full collection (~190 mods) + Cheat Menu: Rebuild, no Steam client needed.
 #>
 $ErrorActionPreference = 'Stop'
@@ -17,7 +17,7 @@ $NL          = [Environment]::NewLine
 # Target game build. B43 = change these lines; the layout repair and [10] checks derive from them.
 $GameBuild = '42'      # major build: version folder name (42/)
 $GameBuildFull = '42.21'  # current full build: versionMax floor for [10] warnings
-$ScriptVersion = '455'    # app version: shown in the menu header + GUI title
+$ScriptVersion = '456'    # app version: shown in the menu header + GUI title
 
 # All known categories, including ones with zero mods right now (Maps /
 # Audio / Zombies have no catalog mods yet). The category editor lists
@@ -1948,7 +1948,7 @@ function Copy-ModFolder([string]$srcP, [string]$dstP) {
   $srcL = Get-LongPath $srcP
   $dstL = Get-LongPath $dstP
   if (-not [IO.Directory]::Exists($srcL)) { return }
-  [IO.Directory]::CreateDirectory($dstL) | Out-Null
+  try { [IO.Directory]::CreateDirectory($dstL) | Out-Null } catch { throw ('Cannot create the install folder: ' + $dstL + ' - ' + $_.Exception.Message) }
   $copyErr = $null
   $stack = New-Object System.Collections.Stack
   $stack.Push(@($srcL, $dstL))
@@ -1988,6 +1988,22 @@ function Test-ModInfoExists([string]$dirPath) {
 }
 function Test-PathLong([string]$p) {
   try { return ([IO.Directory]::Exists((Get-LongPath $p)) -or [IO.File]::Exists((Get-LongPath $p))) } catch { return $false }
+}
+function Get-SafeFolderName([string]$n) {
+  # Windows rejects folder names containing <>:"|?* or control
+  # characters, names ending in a space or a dot, and reserved
+  # device names (CON, AUX, NUL...) - mod authors ship all of
+  # these, and an unvalidated name made CreateDirectory throw
+  # 'filename syntax is incorrect' for BMP-2, M60A3 Tank and
+  # Material Weight Reducer. The game finds a mod by the ID in
+  # its mod.info, not by the folder name, so cleaning the name
+  # is safe.
+  $c = ($n -replace '[<>:"/\\|?*]', '_')
+  $c = ($c -replace '[\x00-\x1F]', '_').Trim()
+  $c = $c.TrimEnd([char]'.', [char]' ')
+  if ($c -match '^(?i)(CON|PRN|AUX|NUL|COM[1-9]|LPT[1-9])(\..*)?$') { $c = ($c + '_') }
+  if ($c -eq '') { $c = 'mod' }
+  return $c
 }
 function Get-ModInfoDirs([string]$root) {
   # Every folder under $root that contains a mod.info, as
@@ -2069,6 +2085,7 @@ function Complete-InstallModCore([string]$WorkshopId, [string]$Name, $keptDirs, 
       if ($mid -match '^[A-Za-z0-9_.\-]+$') { $dirName = $mid }
       else { $dirName = ($WorkshopId + '_' + $m.Name) }
     }
+    $dirName = Get-SafeFolderName $dirName
     if ($dirName.Length -gt 100) {
       # A pathologically long folder name overflows the Windows
       # path limit for everything inside it; install under the
