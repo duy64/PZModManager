@@ -1,7 +1,7 @@
 # PZ Mod Manager - Created by duy64. Licensed under the MIT License (see LICENSE.txt).
 #Requires -Version 5.1
 <#
-  PZ Mod Manager v458 - B42 Essentials: mod pack for Single-Player & Multiplayer
+  PZ Mod Manager v459 - B42 Essentials: mod pack for Single-Player & Multiplayer
   Full collection (~190 mods) + Cheat Menu: Rebuild, no Steam client needed.
 #>
 $ErrorActionPreference = 'Stop'
@@ -17,7 +17,7 @@ $NL          = [Environment]::NewLine
 # Target game build. B43 = change these lines; the layout repair and [10] checks derive from them.
 $GameBuild = '42'      # major build: version folder name (42/)
 $GameBuildFull = '42.21'  # current full build: versionMax floor for [10] warnings
-$ScriptVersion = '458'    # app version: shown in the menu header + GUI title
+$ScriptVersion = '459'    # app version: shown in the menu header + GUI title
 
 # All known categories, including ones with zero mods right now (Maps /
 # Audio / Zombies have no catalog mods yet). The category editor lists
@@ -1811,6 +1811,11 @@ $DepMap = @{
 }
 # ModID -> WorkshopID for generic require= resolution (when a mod needs a dep not in DepMap)
 $ModIdToWorkshop = @{
+  # Renamed B42 ports: older mods still require the B41-era Mod
+  # ID; the B42 port of the same mod declares a new ID and is
+  # the provider of that dependency on B42.
+  'StandardizedVehicleUpgradesV3' = '3403490889'
+  'FancyHandwork' = '2952417073'
   'ZombieBuddy' = '3619862853'
   'Viewpoint' = '3809306528'
   'PZVoxelStudioViewpoint' = '3810302175'
