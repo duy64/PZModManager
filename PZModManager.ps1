@@ -1,7 +1,7 @@
 # PZ Mod Manager - Created by duy64. Licensed under the MIT License (see LICENSE.txt).
 #Requires -Version 5.1
 <#
-  PZ Mod Manager v446 - B42 Essentials: mod pack for Single-Player & Multiplayer
+  PZ Mod Manager v447 - B42 Essentials: mod pack for Single-Player & Multiplayer
   Full collection (~190 mods) + Cheat Menu: Rebuild, no Steam client needed.
 #>
 $ErrorActionPreference = 'Stop'
@@ -17,7 +17,7 @@ $NL          = [Environment]::NewLine
 # Target game build. B43 = change these lines; the layout repair and [10] checks derive from them.
 $GameBuild = '42'      # major build: version folder name (42/)
 $GameBuildFull = '42.21'  # current full build: versionMax floor for [10] warnings
-$ScriptVersion = '446'    # app version: shown in the menu header + GUI title
+$ScriptVersion = '447'    # app version: shown in the menu header + GUI title
 
 # All known categories, including ones with zero mods right now (Maps /
 # Audio / Zombies have no catalog mods yet). The category editor lists
@@ -1773,6 +1773,7 @@ $DepMap = @{
   '3579088411' = @('3396446795', '3389605231')   # Infirmities -> Moodle Framework + TchernoLib
   '3253385114' = @('3171167894')   # '81 DeLorean DMC-12 -> that DAMN Library (KI5 framework)
   '3005903549' = @('3171167894')   # '63 Volkswagen 1300 Beetle -> that DAMN Library
+  '3017885370' = @('2897536185')   # Totally's American Firearms -> Totally's Historical Firearms Pack - Core
 }
 # ModID -> WorkshopID for generic require= resolution (when a mod needs a dep not in DepMap)
 $ModIdToWorkshop = @{
@@ -1785,6 +1786,8 @@ $ModIdToWorkshop = @{
   'WarThunderVehicleLibrary' = '3399660368'
   'TchernoLib' = '3389605231'
   'damnlib' = '3171167894'
+  'TIHFP' = '2897536185'
+  'TIHFPClassic' = '2897536185'
   '63beetle' = '3005903549'
   '63beetleBuggy' = '3005903549'
   '63beetleHP' = '3005903549'
