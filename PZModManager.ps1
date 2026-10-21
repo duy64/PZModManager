@@ -1,7 +1,7 @@
 # PZ Mod Manager - Created by duy64. Licensed under the MIT License (see LICENSE.txt).
 #Requires -Version 5.1
 <#
-  PZ Mod Manager v456 - B42 Essentials: mod pack for Single-Player & Multiplayer
+  PZ Mod Manager v457 - B42 Essentials: mod pack for Single-Player & Multiplayer
   Full collection (~190 mods) + Cheat Menu: Rebuild, no Steam client needed.
 #>
 $ErrorActionPreference = 'Stop'
@@ -17,7 +17,7 @@ $NL          = [Environment]::NewLine
 # Target game build. B43 = change these lines; the layout repair and [10] checks derive from them.
 $GameBuild = '42'      # major build: version folder name (42/)
 $GameBuildFull = '42.21'  # current full build: versionMax floor for [10] warnings
-$ScriptVersion = '456'    # app version: shown in the menu header + GUI title
+$ScriptVersion = '457'    # app version: shown in the menu header + GUI title
 
 # All known categories, including ones with zero mods right now (Maps /
 # Audio / Zombies have no catalog mods yet). The category editor lists
@@ -2247,7 +2247,10 @@ function Complete-DeferredInstall($pending, $decision) {
     }
   }
   $droppedIds = @(@($pending.VersionDroppedIds) + @($pickerDropped))
-  return (Complete-InstallModCore [string]$pending.WorkshopId [string]$pending.Name $keptDirs @($decision.KeptIds) $droppedIds $pending.Prop0 [string]$pending.Src)
+  $pendWid = [string]$pending.WorkshopId
+  $pendName = [string]$pending.Name
+  $pendSrc = [string]$pending.Src
+  return (Complete-InstallModCore $pendWid $pendName $keptDirs @($decision.KeptIds) $droppedIds $pending.Prop0 $pendSrc)
 }
 
 function Install-Mod([string]$WorkshopId, [string]$Name) {
@@ -2687,6 +2690,13 @@ function Repair-InstallRecords {
   $map = Get-InstallMap
   if (-not $map) { $map = New-Object PSObject }
   $dirty = $false
+  # Remove garbage keys written by the cast-in-argument bug (a
+  # stringified pending object, '[string]@{WorkshopId=...', used
+  # as the map key by deferred completions). The real records
+  # live under the numeric Workshop IDs.
+  foreach ($prop in @($map.PSObject.Properties)) {
+    if ([string]$prop.Name.StartsWith('[string]@{')) { $map.PSObject.Properties.Remove([string]$prop.Name); $dirty = $true }
+  }
   $nameOf = @{}
   foreach ($m in @($script:Mods)) { $nameOf[[string]$m.WorkshopId] = [string]$m.Name }
   $check = @{}
@@ -4400,8 +4410,9 @@ function Uninstall-GuiSelectedMods {
     $orpRes = Show-GuiWpfPicker 'Orphaned Dependencies' 'These auto-added dependencies are no longer required by any installed mod. Select the ones to remove (they will be removed from the list and uninstalled).' $orpCands $orpCols 'Remove Selected'
     if (-not $orpRes.Failed -and $orpRes.Selected) {
       foreach ($sel in @($orpRes.Selected)) {
-        Remove-ModFromActiveList [string]$sel.WorkshopId
-        [void](Remove-WorkshopId [string]$sel.WorkshopId)
+        $selWid = [string]$sel.WorkshopId
+        Remove-ModFromActiveList $selWid
+        [void](Remove-WorkshopId $selWid)
       }
     }
   }
@@ -5998,7 +6009,7 @@ function Install-GuiSelectedMods {
       foreach ($sel in @($pcRes.Selected)) {
         $pf = @($preFailed | Where-Object { [string]$_.WorkshopId -eq [string]$sel.WorkshopId })[0]
         $cic = $false
-        if ($pf) { try { $cic = Complete-InstallModCore [string]$pf.WorkshopId [string]$pf.Name @($pf.KeptDirs) @($pf.CarryVariants) @($pf.DroppedIds) $pf.Prop0 [string]$pf.Src -SkipPreCheck } catch { Write-GuiErrorDump $_ ('CompletePreCheck ' + [string]$pf.WorkshopId); $script:BatchFailReasons[[string]$pf.WorkshopId] = (Get-ErrorReason $_) } }
+        if ($pf) { $pfWid = [string]$pf.WorkshopId; $pfName = [string]$pf.Name; $pfSrc = [string]$pf.Src; try { $cic = Complete-InstallModCore $pfWid $pfName @($pf.KeptDirs) @($pf.CarryVariants) @($pf.DroppedIds) $pf.Prop0 $pfSrc -SkipPreCheck } catch { Write-GuiErrorDump $_ ('CompletePreCheck ' + [string]$pf.WorkshopId); $script:BatchFailReasons[[string]$pf.WorkshopId] = (Get-ErrorReason $_) } }
         if ($cic -eq $true) { $ok++ } elseif ($cic -eq $false -and -not $script:BatchFailReasons.ContainsKey([string]$pf.WorkshopId)) { $frNow = 'Install failed'; if ($script:InstallFailReason) { $frNow = [string]$script:InstallFailReason }; $script:BatchFailReasons[[string]$pf.WorkshopId] = $frNow }
       }
     }
