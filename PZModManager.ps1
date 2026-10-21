@@ -1,7 +1,7 @@
 # PZ Mod Manager - Created by duy64. Licensed under the MIT License (see LICENSE.txt).
 #Requires -Version 5.1
 <#
-  PZ Mod Manager v452 - B42 Essentials: mod pack for Single-Player & Multiplayer
+  PZ Mod Manager v453 - B42 Essentials: mod pack for Single-Player & Multiplayer
   Full collection (~190 mods) + Cheat Menu: Rebuild, no Steam client needed.
 #>
 $ErrorActionPreference = 'Stop'
@@ -17,7 +17,7 @@ $NL          = [Environment]::NewLine
 # Target game build. B43 = change these lines; the layout repair and [10] checks derive from them.
 $GameBuild = '42'      # major build: version folder name (42/)
 $GameBuildFull = '42.21'  # current full build: versionMax floor for [10] warnings
-$ScriptVersion = '452'    # app version: shown in the menu header + GUI title
+$ScriptVersion = '453'    # app version: shown in the menu header + GUI title
 
 # All known categories, including ones with zero mods right now (Maps /
 # Audio / Zombies have no catalog mods yet). The category editor lists
@@ -439,7 +439,11 @@ function Get-NamedLists {
     try {
       $d = Get-Content $f.FullName -Raw -ErrorAction Stop | ConvertFrom-Json
       $mods = @($d.mods)
-      $out += [PSCustomObject]@{ Name = [string]$d.name; Safe = [IO.Path]::GetFileNameWithoutExtension($f.Name); File = $f.FullName; Count = $mods.Count; Created = [string]$d.created }
+      # The Mods tab never shows retired mods, so the Lists count
+      # excludes them too - otherwise the two tabs disagreed
+      # (Default showed 220 here and 213 on the Mods tab).
+      $visibleMods = @($mods | Where-Object { $script:RetiredWorkshopIds -notcontains [string]$_.workshopId })
+      $out += [PSCustomObject]@{ Name = [string]$d.name; Safe = [IO.Path]::GetFileNameWithoutExtension($f.Name); File = $f.FullName; Count = $visibleMods.Count; Created = [string]$d.created }
     } catch { }
   }
   return $out
@@ -1939,7 +1943,7 @@ function Test-ModInfoExists([string]$dirPath) {
   # and Material Weight Reducer failures - their download trees
   # contain a directory path over the limit). The .NET check with
   # the long-path prefix never throws.
-  try { return [IO.File]::Exists((Join-Path (Get-LongPath $dirPath) 'mod.info')) } catch { return $false }
+  try { return [IO.File]::Exists(((Get-LongPath $dirPath) + '\mod.info')) } catch { return $false }
 }
 function Test-PathLong([string]$p) {
   try { return ([IO.Directory]::Exists((Get-LongPath $p)) -or [IO.File]::Exists((Get-LongPath $p))) } catch { return $false }
@@ -1961,7 +1965,11 @@ function Get-ModInfoDirs([string]$root) {
     $subs = @()
     try { $subs = @([IO.Directory]::EnumerateDirectories($cur)) } catch { continue }
     foreach ($d in $subs) {
-      if ([IO.File]::Exists((Join-Path $d 'mod.info'))) { $out += (New-Object IO.DirectoryInfo($d)) }
+      if ([IO.File]::Exists(($d + '\mod.info'))) {
+        $cleanD = $d
+        if ($cleanD -like '\\?\*') { $cleanD = $cleanD.Substring(4) }
+        $out += (New-Object IO.DirectoryInfo($cleanD))
+      }
       $stack.Push($d)
     }
   }
