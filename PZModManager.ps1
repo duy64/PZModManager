@@ -1,7 +1,7 @@
 # PZ Mod Manager - Created by duy64. Licensed under the MIT License (see LICENSE.txt).
 #Requires -Version 5.1
 <#
-  PZ Mod Manager v463 - B42 Essentials: mod pack for Single-Player & Multiplayer
+  PZ Mod Manager v464 - B42 Essentials: mod pack for Single-Player & Multiplayer
   Full collection (~190 mods) + Cheat Menu: Rebuild, no Steam client needed.
 #>
 $ErrorActionPreference = 'Stop'
@@ -17,7 +17,7 @@ $NL          = [Environment]::NewLine
 # Target game build. B43 = change these lines; the layout repair and [10] checks derive from them.
 $GameBuild = '42'      # major build: version folder name (42/)
 $GameBuildFull = '42.21'  # current full build: versionMax floor for [10] warnings
-$ScriptVersion = '463'    # app version: shown in the menu header + GUI title
+$ScriptVersion = '464'    # app version: shown in the menu header + GUI title
 
 # All known categories, including ones with zero mods right now (Maps /
 # Audio / Zombies have no catalog mods yet). The category editor lists
@@ -1835,7 +1835,7 @@ $ModIdToWorkshop = @{
   # Renamed B42 ports: older mods still require the B41-era Mod
   # ID; the B42 port of the same mod declares a new ID and is
   # the provider of that dependency on B42.
-  'StandardizedVehicleUpgradesV3' = '3403490889'
+  'StandardizedVehicleUpgrades3V' = '3403490889'
   'FancyHandwork' = '2952417073'
   'ZombieBuddy' = '3619862853'
   'Viewpoint' = '3809306528'
@@ -1950,7 +1950,10 @@ function Test-PreInstallCompatible([string]$WorkshopId, [string]$Name, $keptDirs
     }
     $reqM = [regex]::Match($raw, '(?m)^\s*require\s*=\s*(.+?)\s*$')
     if ($reqM.Success) {
-      $reqIds = @($reqM.Groups[1].Value -split '[,;]' | ForEach-Object { $_.Trim().TrimStart('\') } | Where-Object { $_ -ne '' })
+      # A require= entry starting with a backslash is OPTIONAL
+      # in Project Zomboid (load order only - the mod loads
+      # without it), so it is never a hard dependency here.
+      $reqIds = @($reqM.Groups[1].Value -split '[,;]' | ForEach-Object { $_.Trim() } | Where-Object { $_ -ne '' -and -not $_.StartsWith('\') } | ForEach-Object { $_.TrimStart('\') })
       $diskMap = Get-DiskModIdMap
       foreach ($rid in $reqIds) {
         if (Test-RequireSatisfiedOnDisk $rid $diskMap $ownIds) { continue }
@@ -2034,7 +2037,7 @@ function Test-PathLong([string]$p) {
 # when a current ID is installed - the mod was renamed for
 # B42, or a maintained fork superseded the original port.
 $ModIdAliases = @{
-  'StandardizedVehicleUpgradesV3' = @('StandardizedVehicleUpgrades3Core')
+  'StandardizedVehicleUpgrades3V' = @('StandardizedVehicleUpgrades3Core')
   'FancyHandwork' = @('FancyHandworkB42_19', 'FancyHandworkB42_21_Fixed')
 }
 function Test-RequireSatisfiedOnDisk([string]$rid, $diskIds, $ownIds) {
@@ -5426,7 +5429,7 @@ function Get-CompatibilityReport {
       }
       $reqM = [regex]::Match($raw, '(?m)^\s*require\s*=\s*(.+?)\s*$')
       if ($reqM.Success) {
-        $reqIds = @($reqM.Groups[1].Value -split '[,;]' | ForEach-Object { $_.Trim().TrimStart('\') } | Where-Object { $_ -ne '' })
+        $reqIds = @($reqM.Groups[1].Value -split '[,;]' | ForEach-Object { $_.Trim() } | Where-Object { $_ -ne '' -and -not $_.StartsWith('\') } | ForEach-Object { $_.TrimStart('\') })
         foreach ($rid in $reqIds) {
           if (Test-RequireSatisfiedOnDisk $rid $diskModIds $null) { continue }
           if ($missingDeps -notcontains $rid) { $missingDeps += $rid }
@@ -6933,7 +6936,12 @@ function Refresh-GuiNamedLists {
     if ($listChanged) { Save-NamedListData $l.Safe $d.name $listMods }
     $dispName = [string]$l.Name
     if ($l.Safe -eq $active) { $dispName += ' (active)' }
-    $rows += [PSCustomObject]@{ Name = $dispName; Date = [string]$d.created; Mods = $listMods.Count; Safe = [string]$l.Safe; IsChecked = $script:GuiSelectedLists.ContainsKey($l.Safe) }
+    # Show the same count the Mods tab shows for this list:
+    # unique, non-retired members. (The raw entry count was
+    # used here before - Default showed 222 for 215 mods: its
+    # file holds 7 retired entries the Mods tab never shows.)
+    $modsShown = @(Get-ListDirectMods $l.Safe | Where-Object { $script:RetiredWorkshopIds -notcontains [string]$_.workshopId }).Count
+    $rows += [PSCustomObject]@{ Name = $dispName; Date = [string]$d.created; Mods = $modsShown; Safe = [string]$l.Safe; IsChecked = $script:GuiSelectedLists.ContainsKey($l.Safe) }
   }
   $col = $script:GuiListsSortColumn
   if ($col -eq 'Name') { if ($script:GuiListsSortDescending) { $rows = @($rows | Sort-Object Name -Descending) } else { $rows = @($rows | Sort-Object Name) } }
