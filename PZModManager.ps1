@@ -1,7 +1,7 @@
 # PZ Mod Manager - Created by duy64. Licensed under the MIT License (see LICENSE.txt).
 #Requires -Version 5.1
 <#
-  PZ Mod Manager v460 - B42 Essentials: mod pack for Single-Player & Multiplayer
+  PZ Mod Manager v461 - B42 Essentials: mod pack for Single-Player & Multiplayer
   Full collection (~190 mods) + Cheat Menu: Rebuild, no Steam client needed.
 #>
 $ErrorActionPreference = 'Stop'
@@ -17,7 +17,7 @@ $NL          = [Environment]::NewLine
 # Target game build. B43 = change these lines; the layout repair and [10] checks derive from them.
 $GameBuild = '42'      # major build: version folder name (42/)
 $GameBuildFull = '42.21'  # current full build: versionMax floor for [10] warnings
-$ScriptVersion = '460'    # app version: shown in the menu header + GUI title
+$ScriptVersion = '461'    # app version: shown in the menu header + GUI title
 
 # All known categories, including ones with zero mods right now (Maps /
 # Audio / Zombies have no catalog mods yet). The category editor lists
@@ -1951,8 +1951,7 @@ function Test-PreInstallCompatible([string]$WorkshopId, [string]$Name, $keptDirs
       $reqIds = @($reqM.Groups[1].Value -split '[,;]' | ForEach-Object { $_.Trim().TrimStart('\') } | Where-Object { $_ -ne '' })
       $diskMap = Get-DiskModIdMap
       foreach ($rid in $reqIds) {
-        if ($ownIds.ContainsKey($rid)) { continue }
-        if ($diskMap.ContainsKey($rid)) { continue }
+        if (Test-RequireSatisfiedOnDisk $rid $diskMap $ownIds) { continue }
         if ($ModIdToWorkshop.ContainsKey($rid)) { if ($willInstallDeps -notcontains $rid) { $willInstallDeps += $rid }; continue }
         $blocked += ($prefix + "Missing dependency '$rid' (unknown Workshop ID - cannot resolve it)")
       }
@@ -2028,6 +2027,27 @@ function Test-ModInfoExists([string]$dirPath) {
 }
 function Test-PathLong([string]$p) {
   try { return ([IO.Directory]::Exists((Get-LongPath $p)) -or [IO.File]::Exists((Get-LongPath $p))) } catch { return $false }
+}
+# Renamed Mod IDs: a require= naming an old ID is satisfied
+# when a current ID is installed - the mod was renamed for
+# B42, or a maintained fork superseded the original port.
+$ModIdAliases = @{
+  'StandardizedVehicleUpgradesV3' = @('StandardizedVehicleUpgrades3Core')
+  'FancyHandwork' = @('FancyHandworkB42_19', 'FancyHandworkB42_21_Fixed')
+}
+function Test-RequireSatisfiedOnDisk([string]$rid, $diskIds, $ownIds) {
+  # True when a require= is met by the mod itself (ownIds) or
+  # by an installed mod (diskIds), under the required ID or
+  # any of its current renamed IDs.
+  if ($ownIds -and $ownIds.ContainsKey($rid)) { return $true }
+  if ($diskIds -and $diskIds.ContainsKey($rid)) { return $true }
+  if ($ModIdAliases.ContainsKey($rid)) {
+    foreach ($alt in @($ModIdAliases[$rid])) {
+      if ($ownIds -and $ownIds.ContainsKey($alt)) { return $true }
+      if ($diskIds -and $diskIds.ContainsKey($alt)) { return $true }
+    }
+  }
+  return $false
 }
 function Get-SafeFolderName([string]$n) {
   # Windows rejects folder names containing <>:"|?* or control
@@ -5351,7 +5371,7 @@ function Get-CompatibilityReport {
       if ($reqM.Success) {
         $reqIds = @($reqM.Groups[1].Value -split '[,;]' | ForEach-Object { $_.Trim().TrimStart('\') } | Where-Object { $_ -ne '' })
         foreach ($rid in $reqIds) {
-          if ($diskModIds.ContainsKey($rid)) { continue }
+          if (Test-RequireSatisfiedOnDisk $rid $diskModIds $null) { continue }
           if ($missingDeps -notcontains $rid) { $missingDeps += $rid }
           if ($ModIdToWorkshop.ContainsKey($rid)) {
             $dw = [string]$ModIdToWorkshop[$rid]
