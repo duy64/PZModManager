@@ -1,7 +1,7 @@
 # PZ Mod Manager - Created by duy64. Licensed under the MIT License (see LICENSE.txt).
 #Requires -Version 5.1
 <#
-  PZ Mod Manager v449 - B42 Essentials: mod pack for Single-Player & Multiplayer
+  PZ Mod Manager v450 - B42 Essentials: mod pack for Single-Player & Multiplayer
   Full collection (~190 mods) + Cheat Menu: Rebuild, no Steam client needed.
 #>
 $ErrorActionPreference = 'Stop'
@@ -17,7 +17,7 @@ $NL          = [Environment]::NewLine
 # Target game build. B43 = change these lines; the layout repair and [10] checks derive from them.
 $GameBuild = '42'      # major build: version folder name (42/)
 $GameBuildFull = '42.21'  # current full build: versionMax floor for [10] warnings
-$ScriptVersion = '449'    # app version: shown in the menu header + GUI title
+$ScriptVersion = '450'    # app version: shown in the menu header + GUI title
 
 # All known categories, including ones with zero mods right now (Maps /
 # Audio / Zombies have no catalog mods yet). The category editor lists
@@ -2006,6 +2006,7 @@ function Complete-InstallModCore([string]$WorkshopId, [string]$Name, $keptDirs, 
       Write-Host ("  Installed: " + $dirName) -ForegroundColor DarkGray
     }
     if (-not (Test-Path (Join-Path $dest 'mod.info'))) {
+      $script:InstallFailReason = 'The copy into the game folder failed verification (no mod.info at the destination)'
       Write-Host ("  FAILED: copy failed for " + $m.Name + " - not recorded as installed") -ForegroundColor Red
       return $false
     }
@@ -2141,6 +2142,7 @@ function Complete-DeferredInstall($pending, $decision) {
 }
 
 function Install-Mod([string]$WorkshopId, [string]$Name) {
+  $script:InstallFailReason = ''
   # An entry with no Workshop ID (bad user data) must not reach the
   # map save - Add-Member with an empty name throws and kills the GUI.
   if ($WorkshopId -notmatch '^\d+$') { return $false }
@@ -2357,8 +2359,8 @@ function Install-Mod([string]$WorkshopId, [string]$Name) {
       Write-Host "  Download came back empty, retrying..." -ForegroundColor Yellow
     }
     if ($modsFound.Count -eq 0) {
-      if (-not (Test-Path $src)) { Write-Host "  FAILED: SteamCMD could not fetch $WorkshopId" -ForegroundColor Red }
-      else { Write-Host ("  FAILED: SteamCMD downloaded nothing usable for " + $WorkshopId + " (workshop item may be down/removed)") -ForegroundColor Red }
+      if (-not (Test-Path $src)) { $script:InstallFailReason = 'SteamCMD could not fetch the item (no download cache after 3 attempts)'; Write-Host "  FAILED: SteamCMD could not fetch $WorkshopId" -ForegroundColor Red }
+      else { $script:InstallFailReason = 'SteamCMD downloaded files, but none contain a mod.info (incomplete download)'; Write-Host ("  FAILED: SteamCMD downloaded nothing usable for " + $WorkshopId + " (workshop item may be down/removed)") -ForegroundColor Red }
       return $false
     }
   } else {
@@ -2394,7 +2396,7 @@ function Install-Mod([string]$WorkshopId, [string]$Name) {
       $modsFound = @(Get-ChildItem $src -Recurse | Where-Object { $_.PSIsContainer } | Where-Object { Test-Path (Join-Path $_.FullName 'mod.info') })
     }
   }
-  if ($modsFound.Count -eq 0) { Write-Host ("  WARNING: no mod found inside " + $WorkshopId) -ForegroundColor Yellow; return $false }
+  if ($modsFound.Count -eq 0) { $script:InstallFailReason = 'No mod folder found in the downloaded files'; Write-Host ("  WARNING: no mod found inside " + $WorkshopId) -ForegroundColor Yellow; return $false }
   # Dedup: same mod id appearing twice (e.g. 41/ and 42/ subfolders) - keep one, prefer the 42 build
   $byId = @{}
   foreach ($m in $modsFound) {
@@ -5789,6 +5791,7 @@ function Install-GuiSelectedMods {
   $script:BatchPreCheckDecisions = $true
   $script:PendingPreCheckFailures = @()
   $script:BatchUserSkipped = @()
+  $script:BatchFailReasons = @{}
   # Install every checked mod in the Mods tab (Install selected). Selection
   # is cleared after install and on filter changes (see Clear-GuiSelection).
   # Mods already installed are skipped by Install-Mod ('make sure it is there').
@@ -5810,15 +5813,15 @@ function Install-GuiSelectedMods {
     $inMods[[string]$m.WorkshopId] = $true
     $n++; Show-GuiInstallProgress $n $ids.Count $m.Name $start 'Installing'
     $r = $false
-    try { $r = Install-Mod $m.WorkshopId $m.Name } catch { Write-GuiErrorDump $_ ('InstallMod ' + [string]$m.WorkshopId) }
-    if ($r -eq $true) { $ok++ }
+    try { $r = Install-Mod $m.WorkshopId $m.Name } catch { Write-GuiErrorDump $_ ('InstallMod ' + [string]$m.WorkshopId); $script:BatchFailReasons[[string]$m.WorkshopId] = ('Error: ' + $_.Exception.Message) }
+    if ($r -eq $true) { $ok++ } elseif ($r -eq $false -and -not $script:BatchFailReasons.ContainsKey([string]$m.WorkshopId)) { $frNow = 'Install failed'; if ($script:InstallFailReason) { $frNow = [string]$script:InstallFailReason }; $script:BatchFailReasons[[string]$m.WorkshopId] = $frNow }
     if ($script:AbortVariantBatch) { break }
   }
   # Selected mods not in the current working set (checked in another list view)
   # still install, using the stored name.
   foreach ($id in $ids) {
     if ($script:AbortVariantBatch) { break }
-    if (-not $inMods.ContainsKey($id)) { $n++; Show-GuiInstallProgress $n $ids.Count $script:GuiSelectedMods[$id] $start 'Installing'; $r2 = $false; try { $r2 = Install-Mod $id $script:GuiSelectedMods[$id] } catch { Write-GuiErrorDump $_ ('InstallMod ' + [string]$id) }; if ($r2 -eq $true) { $ok++ } }
+    if (-not $inMods.ContainsKey($id)) { $n++; Show-GuiInstallProgress $n $ids.Count $script:GuiSelectedMods[$id] $start 'Installing'; $r2 = $false; try { $r2 = Install-Mod $id $script:GuiSelectedMods[$id] } catch { Write-GuiErrorDump $_ ('InstallMod ' + [string]$id); $script:BatchFailReasons[[string]$id] = ('Error: ' + $_.Exception.Message) }; if ($r2 -eq $true) { $ok++ } elseif ($r2 -eq $false -and -not $script:BatchFailReasons.ContainsKey([string]$id)) { $frNow = 'Install failed'; if ($script:InstallFailReason) { $frNow = [string]$script:InstallFailReason }; $script:BatchFailReasons[[string]$id] = $frNow } }
   }
   # Consolidated picker: decide ALL deferred multi-variant mods at once.
   # Batch mode is OFF for the complete phase (its dependency installs
@@ -5838,8 +5841,8 @@ function Install-GuiSelectedMods {
         if (-not $dec) { $dec = @{ KeptIndices = @(0..(@($pd.VariantDirs).Count - 1)); KeptIds = @($pd.Candidates | ForEach-Object { [string]$_.WorkshopId }) } }
         if ($dec -and @($dec.KeptIndices).Count -eq 0) { $script:BatchUserSkipped += [string]$pd.WorkshopId }
         $cdi = $false
-        try { $cdi = Complete-DeferredInstall $pd $dec } catch { Write-GuiErrorDump $_ ('CompleteDeferred ' + [string]$pd.WorkshopId) }
-        if ($cdi -eq $true) { $ok++ }
+        try { $cdi = Complete-DeferredInstall $pd $dec } catch { Write-GuiErrorDump $_ ('CompleteDeferred ' + [string]$pd.WorkshopId); $script:BatchFailReasons[[string]$pd.WorkshopId] = ('Error: ' + $_.Exception.Message) }
+        if ($cdi -eq $true) { $ok++ } elseif ($cdi -eq $false -and -not $script:BatchFailReasons.ContainsKey([string]$pd.WorkshopId)) { $frNow = 'Install failed'; if ($script:InstallFailReason) { $frNow = [string]$script:InstallFailReason }; $script:BatchFailReasons[[string]$pd.WorkshopId] = $frNow }
       }
     }
   }
@@ -5864,8 +5867,8 @@ function Install-GuiSelectedMods {
       foreach ($sel in @($pcRes.Selected)) {
         $pf = @($preFailed | Where-Object { [string]$_.WorkshopId -eq [string]$sel.WorkshopId })[0]
         $cic = $false
-        if ($pf) { try { $cic = Complete-InstallModCore [string]$pf.WorkshopId [string]$pf.Name @($pf.KeptDirs) @($pf.CarryVariants) @($pf.DroppedIds) $pf.Prop0 [string]$pf.Src -SkipPreCheck } catch { Write-GuiErrorDump $_ ('CompletePreCheck ' + [string]$pf.WorkshopId) } }
-        if ($cic -eq $true) { $ok++ }
+        if ($pf) { try { $cic = Complete-InstallModCore [string]$pf.WorkshopId [string]$pf.Name @($pf.KeptDirs) @($pf.CarryVariants) @($pf.DroppedIds) $pf.Prop0 [string]$pf.Src -SkipPreCheck } catch { Write-GuiErrorDump $_ ('CompletePreCheck ' + [string]$pf.WorkshopId); $script:BatchFailReasons[[string]$pf.WorkshopId] = ('Error: ' + $_.Exception.Message) } }
+        if ($cic -eq $true) { $ok++ } elseif ($cic -eq $false -and -not $script:BatchFailReasons.ContainsKey([string]$pf.WorkshopId)) { $frNow = 'Install failed'; if ($script:InstallFailReason) { $frNow = [string]$script:InstallFailReason }; $script:BatchFailReasons[[string]$pf.WorkshopId] = $frNow }
       }
     }
   }
@@ -5874,10 +5877,16 @@ function Install-GuiSelectedMods {
   $doneText = 'Done: ' + $ok + '/' + $ids.Count + ' selected mods installed.'
   if (@($repairedNames).Count -gt 0) { $doneText += ' Install records repaired for: ' + (@($repairedNames) -join ', ') + '.' }
   $failedNames = @()
+  $failedReasons = @()
   if (-not $script:AbortVariantBatch) {
     $installedNow = Get-InstalledWorkshopIds
     foreach ($aid in $ids) {
-      if ($installedNow -notcontains [string]$aid -and $script:BatchUserSkipped -notcontains [string]$aid) { $failedNames += [string]$script:GuiSelectedMods[$aid] }
+      if ($installedNow -notcontains [string]$aid -and $script:BatchUserSkipped -notcontains [string]$aid) {
+        $failedNames += [string]$script:GuiSelectedMods[$aid]
+        $fr = ''
+        if ($script:BatchFailReasons.ContainsKey([string]$aid)) { $fr = [string]$script:BatchFailReasons[[string]$aid] }
+        $failedReasons += $fr
+      }
     }
     if ($failedNames.Count -gt 0) { $doneText += ' Failed: ' + ($failedNames -join ', ') + '.' }
   }
@@ -5886,7 +5895,9 @@ function Install-GuiSelectedMods {
   # Standard: refresh every view after install (one composite call).
   Refresh-GuiAfterListChange
   if ($failedNames.Count -gt 0) {
-    [void](Show-GuiMessageBox ("These mods could not be installed:`n`n" + ($failedNames -join "`n") + "`n`nThe download usually failed - large mods can need more than one try, and the manager now retries three times and clears a stuck download cache on the last attempt. Nothing was recorded for them; try installing them again.") 'PZ Mod Manager' ([System.Windows.MessageBoxButton]::OK) ([System.Windows.MessageBoxImage]::Warning))
+    $failLines = @()
+    for ($fi2 = 0; $fi2 -lt $failedNames.Count; $fi2++) { if ($failedReasons[$fi2]) { $failLines += ($failedNames[$fi2] + ' - ' + $failedReasons[$fi2]) } else { $failLines += $failedNames[$fi2] } }
+    [void](Show-GuiMessageBox ("These mods could not be installed:`n`n" + ($failLines -join "`n") + "`n`nNothing was recorded for them; try installing them again.") 'PZ Mod Manager' ([System.Windows.MessageBoxButton]::OK) ([System.Windows.MessageBoxImage]::Warning))
   }
   } catch {
     # Batch installs run synchronously under this function, so a
