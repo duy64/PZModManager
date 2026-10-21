@@ -1,7 +1,7 @@
 # PZ Mod Manager - Created by duy64. Licensed under the MIT License (see LICENSE.txt).
 #Requires -Version 5.1
 <#
-  PZ Mod Manager v445 - B42 Essentials: mod pack for Single-Player & Multiplayer
+  PZ Mod Manager v446 - B42 Essentials: mod pack for Single-Player & Multiplayer
   Full collection (~190 mods) + Cheat Menu: Rebuild, no Steam client needed.
 #>
 $ErrorActionPreference = 'Stop'
@@ -17,7 +17,7 @@ $NL          = [Environment]::NewLine
 # Target game build. B43 = change these lines; the layout repair and [10] checks derive from them.
 $GameBuild = '42'      # major build: version folder name (42/)
 $GameBuildFull = '42.21'  # current full build: versionMax floor for [10] warnings
-$ScriptVersion = '445'    # app version: shown in the menu header + GUI title
+$ScriptVersion = '446'    # app version: shown in the menu header + GUI title
 
 # All known categories, including ones with zero mods right now (Maps /
 # Audio / Zombies have no catalog mods yet). The category editor lists
@@ -1126,12 +1126,27 @@ function Get-ModInfoId($modInfoPath) {
   return ''
 }
 
+function ConvertTo-ModVersion([string]$v) {
+  # Parse a mod.info version string ("42", "42.18.999") to a
+  # [version]; $null when it carries no usable number.
+  if ($v -match '^\s*(\d+(?:\.\d+){0,3})\s*$') {
+    $t = $Matches[1]
+    if ($t -notmatch '\.') { $t += '.0' }
+    try { return [version]$t } catch { return $null }
+  }
+  return $null
+}
+
 function Test-ModVersionMatches([string]$modInfoPath) {
   # True if this mod.info's version range includes the running game
-  # build (same test as the Compatibility report's version check:
-  # versionMax int < build = will not load; versionMin int >
-  # build = will not load). Missing version info = keep (cannot
-  # determine - never drop on a guess).
+  # build, comparing FULL versions. The old leading-integer compare
+  # read every 42.x cap as "42", so wrong-build variants slipped
+  # through: CleanUI's 42.16-42.18 package (versionMax=42.18.999)
+  # installed on B42.21, and the Storylines 42.12/42.13 quests
+  # installed beside the 42.15 ones. A bare major versionMax ("42")
+  # means the whole 42 line and is treated as 42.9999; a bare major
+  # versionMin means .0. Missing or unparseable version info =
+  # keep (never drop on a guess).
   $raw = ''
   try { $raw = Get-Content $modInfoPath -Raw -ErrorAction Stop } catch { return $true }
   $vMin = ''; $vMax = ''
@@ -1139,15 +1154,20 @@ function Test-ModVersionMatches([string]$modInfoPath) {
   if ($mmMin.Success) { $vMin = $mmMin.Groups[1].Value.Trim() }
   $mmMax = [regex]::Match($raw, '(?m)^\s*versionMax\s*=\s*(.+?)\s*$')
   if ($mmMax.Success) { $vMax = $mmMax.Groups[1].Value.Trim() }
-  $build = 42
-  try { $build = [int]$GameBuild } catch { }
+  $buildFull = $null
+  try { $buildFull = [version]$GameBuildFull } catch { }
+  if (-not $buildFull) { try { $buildFull = [version]([string]$GameBuild + '.0') } catch { return $true } }
   if ($vMax -ne '') {
-    $mMax = [regex]::Match($vMax, '^\d+')
-    if ($mMax.Success -and [int]$mMax.Value -lt $build) { return $false }
+    $pMax = ConvertTo-ModVersion $vMax
+    if ($pMax) {
+      $effMax = $pMax
+      if ($vMax -notmatch '\.') { $effMax = [version]([string]$pMax.Major + '.9999.9999') }
+      if ($effMax -lt $buildFull) { return $false }
+    }
   }
   if ($vMin -ne '') {
-    $mMin = [regex]::Match($vMin, '^\d+')
-    if ($mMin.Success -and [int]$mMin.Value -gt $build) { return $false }
+    $pMin = ConvertTo-ModVersion $vMin
+    if ($pMin -and $pMin -gt $buildFull) { return $false }
   }
   return $true
 }
@@ -1833,14 +1853,17 @@ function Test-PreInstallCompatible([string]$WorkshopId, [string]$Name, $keptDirs
     $vmin = ''; $vmax = ''
     $mmin = [regex]::Match($raw, '(?m)^\s*versionMin\s*=\s*(.+?)\s*$'); if ($mmin.Success) { $vmin = $mmin.Groups[1].Value.Trim() }
     $mmax = [regex]::Match($raw, '(?m)^\s*versionMax\s*=\s*(.+?)\s*$'); if ($mmax.Success) { $vmax = $mmax.Groups[1].Value.Trim() }
-    # Leading-integer compare (same as Test-ModVersionMatches): a
-    # decimal cap like versionMax=41.99 still excludes B42.
-    $mMaxInt = [regex]::Match($vmax, '^\d+')
-    if ($mMaxInt.Success -and [int]$mMaxInt.Value -lt [int]$GameBuild) { $blocked += ($prefix + "versionMax=$vmax is older than B$GameBuild (game will not load it)") }
-    else {
-      $mMinInt = [regex]::Match($vmin, '^\d+')
-      if ($mMinInt.Success -and [int]$mMinInt.Value -gt [int]$GameBuild) { $blocked += ($prefix + "versionMin=$vmin is newer than B$GameBuild (game will not load it)") }
-    }
+    # Full-version compare (same as Test-ModVersionMatches): a
+    # decimal cap like versionMax=42.18.999 excludes B42.21.
+    $pvMax = ConvertTo-ModVersion $vmax
+    $pvMin = ConvertTo-ModVersion $vmin
+    $buildV = $null
+    try { $buildV = [version]$GameBuildFull } catch { }
+    if ($pvMax -and $buildV) {
+      $effMax2 = $pvMax
+      if ($vmax -notmatch '\.') { $effMax2 = [version]([string]$pvMax.Major + '.9999.9999') }
+      if ($effMax2 -lt $buildV) { $blocked += ($prefix + "versionMax=$vmax is older than B$GameBuildFull (game will not load it)") }
+    } elseif ($pvMin -and $buildV -and $pvMin -gt $buildV) { $blocked += ($prefix + "versionMin=$vmin is newer than B$GameBuildFull (game will not load it)") }
     $mjar = [regex]::Match($raw, '(?m)^\s*javaJarFile\s*=\s*(.+?)\s*$')
     if ($mjar.Success) {
       $jarRel = $mjar.Groups[1].Value.Trim()
