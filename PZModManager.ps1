@@ -1,7 +1,7 @@
 # PZ Mod Manager - Created by duy64. Licensed under the MIT License (see LICENSE.txt).
 #Requires -Version 5.1
 <#
-  PZ Mod Manager v448 - B42 Essentials: mod pack for Single-Player & Multiplayer
+  PZ Mod Manager v449 - B42 Essentials: mod pack for Single-Player & Multiplayer
   Full collection (~190 mods) + Cheat Menu: Rebuild, no Steam client needed.
 #>
 $ErrorActionPreference = 'Stop'
@@ -17,7 +17,7 @@ $NL          = [Environment]::NewLine
 # Target game build. B43 = change these lines; the layout repair and [10] checks derive from them.
 $GameBuild = '42'      # major build: version folder name (42/)
 $GameBuildFull = '42.21'  # current full build: versionMax floor for [10] warnings
-$ScriptVersion = '448'    # app version: shown in the menu header + GUI title
+$ScriptVersion = '449'    # app version: shown in the menu header + GUI title
 
 # All known categories, including ones with zero mods right now (Maps /
 # Audio / Zombies have no catalog mods yet). The category editor lists
@@ -82,6 +82,7 @@ function Resolve-GameBuild {
 $Mods = @(
   # ---------- FRAMEWORKS (installed first) ----------
   @{ Name='that DAMN Library (KI5 framework)'; WorkshopId='3171167894'; Cat='Frameworks' },
+  @{ Name='Elyon Lib'; WorkshopId='3384377738'; Cat='Frameworks' },
   @{ Name="Tsar's Common Library B42"; WorkshopId='3402491515'; Cat='Frameworks' },
   @{ Name='NeatUI Framework [B42]'; WorkshopId='3508537032'; Cat='Frameworks' },
   @{ Name='Starlit Library'; WorkshopId='3378285185'; Cat='Frameworks' },
@@ -1126,6 +1127,17 @@ function Get-ModInfoId($modInfoPath) {
   return ''
 }
 
+function Get-VersionKey([version]$v) {
+  # Canonical comparison key: a mod declaring 42.21.0 means the
+  # 42.21 build, but strict [version] comparison ranks 42.21.0
+  # ABOVE 42.21 (Build -1 sorts below 0), which falsely flagged
+  # Project A-Life (versionMin=42.21.0) as "newer than B42.21".
+  # Compare Major.Minor.Build with Build -1 treated as 0 and the
+  # Revision ignored.
+  $b = $v.Build; if ($b -lt 0) { $b = 0 }
+  return [version]([string]$v.Major + '.' + [string]$v.Minor + '.' + [string]$b)
+}
+
 function ConvertTo-ModVersion([string]$v) {
   # Parse a mod.info version string ("42", "42.18.999") to a
   # [version]; $null when it carries no usable number.
@@ -1157,17 +1169,18 @@ function Test-ModVersionMatches([string]$modInfoPath) {
   $buildFull = $null
   try { $buildFull = [version]$GameBuildFull } catch { }
   if (-not $buildFull) { try { $buildFull = [version]([string]$GameBuild + '.0') } catch { return $true } }
+  $buildKey = Get-VersionKey $buildFull
   if ($vMax -ne '') {
     $pMax = ConvertTo-ModVersion $vMax
     if ($pMax) {
       $effMax = $pMax
       if ($vMax -notmatch '\.') { $effMax = [version]([string]$pMax.Major + '.9999.9999') }
-      if ($effMax -lt $buildFull) { return $false }
+      if ((Get-VersionKey $effMax) -lt $buildKey) { return $false }
     }
   }
   if ($vMin -ne '') {
     $pMin = ConvertTo-ModVersion $vMin
-    if ($pMin -and $pMin -gt $buildFull) { return $false }
+    if ($pMin -and (Get-VersionKey $pMin) -gt $buildKey) { return $false }
   }
   return $true
 }
@@ -1774,6 +1787,7 @@ $DepMap = @{
   '3253385114' = @('3171167894')   # '81 DeLorean DMC-12 -> that DAMN Library (KI5 framework)
   '3005903549' = @('3171167894')   # '63 Volkswagen 1300 Beetle -> that DAMN Library
   '3017885370' = @('2897536185')   # Totally's American Firearms -> Totally's Historical Firearms Pack - Core
+  '3772269882' = @('3384377738')   # Knox Buildworks -> Elyon Lib
 }
 # ModID -> WorkshopID for generic require= resolution (when a mod needs a dep not in DepMap)
 $ModIdToWorkshop = @{
@@ -1788,6 +1802,7 @@ $ModIdToWorkshop = @{
   'damnlib' = '3171167894'
   'TIHFP' = '2897536185'
   'TIHFPClassic' = '2897536185'
+  'ElyonLib' = '3384377738'
   '63beetle' = '3005903549'
   '63beetleBuggy' = '3005903549'
   '63beetleHP' = '3005903549'
@@ -1865,8 +1880,8 @@ function Test-PreInstallCompatible([string]$WorkshopId, [string]$Name, $keptDirs
     if ($pvMax -and $buildV) {
       $effMax2 = $pvMax
       if ($vmax -notmatch '\.') { $effMax2 = [version]([string]$pvMax.Major + '.9999.9999') }
-      if ($effMax2 -lt $buildV) { $blocked += ($prefix + "versionMax=$vmax is older than B$GameBuildFull (game will not load it)") }
-    } elseif ($pvMin -and $buildV -and $pvMin -gt $buildV) { $blocked += ($prefix + "versionMin=$vmin is newer than B$GameBuildFull (game will not load it)") }
+      if ((Get-VersionKey $effMax2) -lt (Get-VersionKey $buildV)) { $blocked += ($prefix + "versionMax=$vmax is older than B$GameBuildFull (game will not load it)") }
+    } elseif ($pvMin -and $buildV -and (Get-VersionKey $pvMin) -gt (Get-VersionKey $buildV)) { $blocked += ($prefix + "versionMin=$vmin is newer than B$GameBuildFull (game will not load it)") }
     $mjar = [regex]::Match($raw, '(?m)^\s*javaJarFile\s*=\s*(.+?)\s*$')
     if ($mjar.Success) {
       $jarRel = $mjar.Groups[1].Value.Trim()

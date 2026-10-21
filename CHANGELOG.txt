@@ -1,6 +1,7 @@
 PZ MOD MANAGER - FULL CHANGELOG
 Created by duy64. Licensed under the MIT License (see LICENSE.txt).
 
+v449: Fixed false alarms in the version checks: 42.21.0 now compares equal to B42.21 (Project A-Life was flagged as 'newer than B42.21' when it is the same build). Dependency data: Elyon Lib (3384377738, Mod ID ElyonLib) added to the catalog and wired for Knox Buildworks.
 v448: The batch-end record repair now also heals records whose folders list is empty: it re-derives the folder names from the item's download cache and matches them against the mods folder (CleanUI's record had no folders despite the mod being on disk, which would have made a later uninstall remove nothing).
 v447: Dependency data: TIHFP and TIHFPClassic now resolve to Totally's Historical Firearms Pack - Core (2897536185), and Totally's American Firearms (3017885370) has the Core in its dependency map.
 v446: Version ranges are now compared in full (42.18.999 is less than 42.21). The old check read only the leading number, so wrong-build variants slipped through: CleanUI's 42.16-42.18 package installed on B42.21 even though the current package supports it, and the Storylines 42.12/42.13 quests installed beside the 42.15 ones. Reinstalling an affected mod now drops the wrong-build folders and installs the matching variant. The pre-install compatibility check uses the same full comparison.
