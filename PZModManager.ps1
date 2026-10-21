@@ -1,7 +1,7 @@
 # PZ Mod Manager - Created by duy64. Licensed under the MIT License (see LICENSE.txt).
 #Requires -Version 5.1
 <#
-  PZ Mod Manager v462 - B42 Essentials: mod pack for Single-Player & Multiplayer
+  PZ Mod Manager v463 - B42 Essentials: mod pack for Single-Player & Multiplayer
   Full collection (~190 mods) + Cheat Menu: Rebuild, no Steam client needed.
 #>
 $ErrorActionPreference = 'Stop'
@@ -17,7 +17,7 @@ $NL          = [Environment]::NewLine
 # Target game build. B43 = change these lines; the layout repair and [10] checks derive from them.
 $GameBuild = '42'      # major build: version folder name (42/)
 $GameBuildFull = '42.21'  # current full build: versionMax floor for [10] warnings
-$ScriptVersion = '462'    # app version: shown in the menu header + GUI title
+$ScriptVersion = '463'    # app version: shown in the menu header + GUI title
 
 # All known categories, including ones with zero mods right now (Maps /
 # Audio / Zombies have no catalog mods yet). The category editor lists
@@ -5387,6 +5387,8 @@ function Get-CompatibilityReport {
       $fid = Get-ModInfoId $miPath
       $prefix = ''
       if ($multi -and $fid) { $prefix = ($fid + ': ') }
+      $relP = $miPath
+      try { $relP = $miPath.Substring($ModsDir.Length).TrimStart('\\','/') } catch { }
       if ($raw -eq '') { $blocked += ($prefix + 'mod.info is empty/unreadable'); continue }
       $utf8Valid = $true
       try {
@@ -5430,10 +5432,10 @@ function Get-CompatibilityReport {
           if ($missingDeps -notcontains $rid) { $missingDeps += $rid }
           if ($ModIdToWorkshop.ContainsKey($rid)) {
             $dw = [string]$ModIdToWorkshop[$rid]
-            if ($listWids -contains $dw) { $blocked += ($prefix + "Missing dependency '$rid' (in list but not installed - install it)") }
-            else { $blocked += ($prefix + "Missing dependency '$rid' (Workshop $dw - not in list)") }
+            if ($listWids -contains $dw) { $blocked += ($prefix + "Missing dependency '$rid' (in list but not installed - install it) (file: " + $relP + ')') }
+            else { $blocked += ($prefix + "Missing dependency '$rid' (Workshop $dw - not in list) (file: " + $relP + ')') }
           } else {
-            $blocked += ($prefix + "Missing dependency '$rid' (unknown Workshop ID - cannot resolve it)")
+            $blocked += ($prefix + "Missing dependency '$rid' (unknown Workshop ID - cannot resolve it) (file: " + $relP + ')')
           }
         }
       }
