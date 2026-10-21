@@ -1,6 +1,7 @@
 PZ MOD MANAGER - FULL CHANGELOG
 Created by duy64. Licensed under the MIT License (see LICENSE.txt).
 
+v448: The batch-end record repair now also heals records whose folders list is empty: it re-derives the folder names from the item's download cache and matches them against the mods folder (CleanUI's record had no folders despite the mod being on disk, which would have made a later uninstall remove nothing).
 v447: Dependency data: TIHFP and TIHFPClassic now resolve to Totally's Historical Firearms Pack - Core (2897536185), and Totally's American Firearms (3017885370) has the Core in its dependency map.
 v446: Version ranges are now compared in full (42.18.999 is less than 42.21). The old check read only the leading number, so wrong-build variants slipped through: CleanUI's 42.16-42.18 package installed on B42.21 even though the current package supports it, and the Storylines 42.12/42.13 quests installed beside the 42.15 ones. Reinstalling an affected mod now drops the wrong-build folders and installs the matching variant. The pre-install compatibility check uses the same full comparison.
 v445: A batch no longer dies with its first bad mod. The crash behind the 12 failed installs was a Windows 260-character path limit (PathTooLongException) hit while replacing a deeply nested mod folder - folder copy and delete operations are now long-path safe, and every mod in a batch is isolated: one failure is logged to gui-error.txt, named in the failure report, and the rest of the batch continues.

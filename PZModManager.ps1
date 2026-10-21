@@ -1,7 +1,7 @@
 # PZ Mod Manager - Created by duy64. Licensed under the MIT License (see LICENSE.txt).
 #Requires -Version 5.1
 <#
-  PZ Mod Manager v447 - B42 Essentials: mod pack for Single-Player & Multiplayer
+  PZ Mod Manager v448 - B42 Essentials: mod pack for Single-Player & Multiplayer
   Full collection (~190 mods) + Cheat Menu: Rebuild, no Steam client needed.
 #>
 $ErrorActionPreference = 'Stop'
@@ -17,7 +17,7 @@ $NL          = [Environment]::NewLine
 # Target game build. B43 = change these lines; the layout repair and [10] checks derive from them.
 $GameBuild = '42'      # major build: version folder name (42/)
 $GameBuildFull = '42.21'  # current full build: versionMax floor for [10] warnings
-$ScriptVersion = '447'    # app version: shown in the menu header + GUI title
+$ScriptVersion = '448'    # app version: shown in the menu header + GUI title
 
 # All known categories, including ones with zero mods right now (Maps /
 # Audio / Zombies have no catalog mods yet). The category editor lists
@@ -2557,7 +2557,7 @@ function Repair-InstallRecords {
   foreach ($pd in @($script:PendingVariantDecisions)) { if (-not $check.ContainsKey([string]$pd.WorkshopId)) { $check[[string]$pd.WorkshopId] = $null } }
   foreach ($wid in @($check.Keys)) {
     $prop = $check[$wid]
-    if ($prop -and $prop.Value.PSObject.Properties['installed'] -and $prop.Value.installed -eq $true) { continue }
+    if ($prop -and $prop.Value.PSObject.Properties['installed'] -and $prop.Value.installed -eq $true -and $prop.Value.PSObject.Properties['folders'] -and @($prop.Value.folders).Count -gt 0) { continue }
     $candNames = @()
     if ($prop -and $prop.Value.PSObject.Properties['folders']) { $candNames += @($prop.Value.folders | ForEach-Object { [string]$_ }) }
     $pd = @($script:PendingVariantDecisions | Where-Object { [string]$_.WorkshopId -eq $wid })[0]
@@ -2569,6 +2569,22 @@ function Repair-InstallRecords {
           if ($mid -match '^[A-Za-z0-9_.\-]+$') { $dn = $mid }
         }
         if ($candNames -notcontains $dn) { $candNames += $dn }
+      }
+    }
+    if ($candNames.Count -eq 0) {
+      # No recorded folder names (a record whose folders list came
+      # back empty): re-derive the candidate names from the item's
+      # download cache, the same scan Install-Mod performs.
+      $cacheSrc = Join-Path (Join-Path (Join-Path $SteamCmdDir 'steamapps') 'workshop') ("content\" + $AppId + "\" + $wid)
+      if (Test-Path $cacheSrc) {
+        foreach ($vd in @(Get-ChildItem $cacheSrc -Recurse -ErrorAction SilentlyContinue | Where-Object { $_.PSIsContainer } | Where-Object { Test-Path (Join-Path $_.FullName 'mod.info') })) {
+          $dn = [string]$vd.Name
+          if ($dn -match '^(?i)(\d{10}([_.].*)?|\d+(\.\d+)*(_\d+(\.\d+)*)?|common|mods?|main|default)$') {
+            $mid = Get-ModInfoId (Join-Path $vd.FullName 'mod.info')
+            if ($mid -match '^[A-Za-z0-9_.\-]+$') { $dn = $mid }
+          }
+          if ($candNames -notcontains $dn) { $candNames += $dn }
+        }
       }
     }
     $present = @()
