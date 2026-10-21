@@ -1,7 +1,7 @@
 # PZ Mod Manager - Created by duy64. Licensed under the MIT License (see LICENSE.txt).
 #Requires -Version 5.1
 <#
-  PZ Mod Manager v459 - B42 Essentials: mod pack for Single-Player & Multiplayer
+  PZ Mod Manager v460 - B42 Essentials: mod pack for Single-Player & Multiplayer
   Full collection (~190 mods) + Cheat Menu: Rebuild, no Steam client needed.
 #>
 $ErrorActionPreference = 'Stop'
@@ -17,7 +17,7 @@ $NL          = [Environment]::NewLine
 # Target game build. B43 = change these lines; the layout repair and [10] checks derive from them.
 $GameBuild = '42'      # major build: version folder name (42/)
 $GameBuildFull = '42.21'  # current full build: versionMax floor for [10] warnings
-$ScriptVersion = '459'    # app version: shown in the menu header + GUI title
+$ScriptVersion = '460'    # app version: shown in the menu header + GUI title
 
 # All known categories, including ones with zero mods right now (Maps /
 # Audio / Zombies have no catalog mods yet). The category editor lists
@@ -440,10 +440,19 @@ function Get-NamedLists {
     try {
       $d = Get-Content $f.FullName -Raw -ErrorAction Stop | ConvertFrom-Json
       $mods = @($d.mods)
-      # The Mods tab never shows retired mods, so the Lists count
-      # excludes them too - otherwise the two tabs disagreed
-      # (Default showed 220 here and 213 on the Mods tab).
-      $visibleMods = @($mods | Where-Object { $script:RetiredWorkshopIds -notcontains [string]$_.workshopId })
+      # The Mods tab loads a list deduped by Workshop ID and
+      # never shows retired mods, so the count uses the same
+      # set - raw entry counts disagreed (Default showed 222
+      # here for 215 unique mods: duplicate entries in the
+      # file were counted here but deduped on the Mods tab).
+      $seenIds = @{}
+      $visibleMods = @()
+      foreach ($lm in $mods) {
+        $lwid = [string]$lm.workshopId
+        if ([string]::IsNullOrWhiteSpace($lwid) -or $seenIds.ContainsKey($lwid)) { continue }
+        $seenIds[$lwid] = $true
+        if ($script:RetiredWorkshopIds -notcontains $lwid) { $visibleMods += $lm }
+      }
       $out += [PSCustomObject]@{ Name = [string]$d.name; Safe = [IO.Path]::GetFileNameWithoutExtension($f.Name); File = $f.FullName; Count = $visibleMods.Count; Created = [string]$d.created }
     } catch { }
   }
@@ -505,7 +514,19 @@ function Save-NamedListData([string]$safe, [string]$name, $mods, $packs = $null,
     if ($old -and $old.PSObject.Properties['removedPacks']) { $removedPacks = @($old.removedPacks) } else { $removedPacks = @() }
   }
   $removedNames = @($removedPacks | ForEach-Object { ([string]$_).Trim() } | Where-Object { $_ -ne '' } | Sort-Object -Unique)
-  $obj = [PSCustomObject]@{ name = [string]$name; created = $created; mods = @($mods | Where-Object { $_ -ne $null -and [string]$_.workshopId -ne '' } | ForEach-Object { [PSCustomObject]@{ workshopId = [string]$_.workshopId; name = [string]$_.name; cat = [string]$_.cat; autoDep = [bool]$_.autoDep } }); packs = $packObjs; categories = $catNames; tracksCatalog = [bool]$tracksCatalog; removedPacks = $removedNames }
+  # One entry per Workshop ID (first wins): duplicate entries
+  # in a list file made the Lists tab count disagree with the
+  # Mods tab, which dedupes on load.
+  $modObjs = @()
+  $seenModIds = @{}
+  foreach ($lm in @($mods)) {
+    if ($null -eq $lm) { continue }
+    $lwid = [string]$lm.workshopId
+    if ($lwid -eq '' -or $seenModIds.ContainsKey($lwid)) { continue }
+    $seenModIds[$lwid] = $true
+    $modObjs += [PSCustomObject]@{ workshopId = $lwid; name = [string]$lm.name; cat = [string]$lm.cat; autoDep = [bool]$lm.autoDep }
+  }
+  $obj = [PSCustomObject]@{ name = [string]$name; created = $created; mods = $modObjs; packs = $packObjs; categories = $catNames; tracksCatalog = [bool]$tracksCatalog; removedPacks = $removedNames }
   $f = Join-Path $ListsDir ([string]$safe + '.json')
   $obj | ConvertTo-Json -Depth 5 | Set-Content $f -Encoding UTF8
 }
