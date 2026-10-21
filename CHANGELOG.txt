@@ -1,6 +1,7 @@
 PZ MOD MANAGER - FULL CHANGELOG
 Created by duy64. Licensed under the MIT License (see LICENSE.txt).
 
+v452: Long-path hardening completed: downloads are enumerated with a .NET long-path walk (PowerShell's recursive listing silently skips subtrees past the Windows limit, which made deeply-nested mods look like empty downloads), folder existence checks never throw, and a mod folder name over 100 characters installs under its Mod ID instead. The final download attempt also clears SteamCMD's staging folder and workshop state file, which can otherwise keep an item stuck in a download-failed loop.
 v451: The download scan no longer uses Test-Path on folder paths: on paths over the Windows 260-character limit Test-Path throws instead of returning false, and that exception inside the scan killed installs for mods whose download trees nest deeply (BMP-2, M60A3 Tank, Material Weight Reducer). The scan now uses a long-path-safe check that never throws. Fetch failures also quote SteamCMD's own error line in the failure dialog.
 v450: Failed installs now report their actual reason in the failure dialog (SteamCMD could not fetch the item, downloaded files contain no mod.info, copy verification failed, or the specific error) instead of a generic download guess.
 v449: Fixed false alarms in the version checks: 42.21.0 now compares equal to B42.21 (Project A-Life was flagged as 'newer than B42.21' when it is the same build). Dependency data: Elyon Lib (3384377738, Mod ID ElyonLib) added to the catalog and wired for Knox Buildworks.

@@ -1,7 +1,7 @@
 # PZ Mod Manager - Created by duy64. Licensed under the MIT License (see LICENSE.txt).
 #Requires -Version 5.1
 <#
-  PZ Mod Manager v451 - B42 Essentials: mod pack for Single-Player & Multiplayer
+  PZ Mod Manager v452 - B42 Essentials: mod pack for Single-Player & Multiplayer
   Full collection (~190 mods) + Cheat Menu: Rebuild, no Steam client needed.
 #>
 $ErrorActionPreference = 'Stop'
@@ -17,7 +17,7 @@ $NL          = [Environment]::NewLine
 # Target game build. B43 = change these lines; the layout repair and [10] checks derive from them.
 $GameBuild = '42'      # major build: version folder name (42/)
 $GameBuildFull = '42.21'  # current full build: versionMax floor for [10] warnings
-$ScriptVersion = '451'    # app version: shown in the menu header + GUI title
+$ScriptVersion = '452'    # app version: shown in the menu header + GUI title
 
 # All known categories, including ones with zero mods right now (Maps /
 # Audio / Zombies have no catalog mods yet). The category editor lists
@@ -1924,8 +1924,9 @@ function Get-LongPath([string]$p) {
   return $p
 }
 function Remove-ModFolder([string]$p) {
-  if (-not (Test-Path $p)) { return }
-  try { [IO.Directory]::Delete((Get-LongPath $p), $true) }
+  $lp = Get-LongPath $p
+  if (-not [IO.Directory]::Exists($lp)) { return }
+  try { [IO.Directory]::Delete($lp, $true) }
   catch { Remove-Item $p -Recurse -Force -ErrorAction SilentlyContinue }
 }
 function Copy-ModFolder([string]$srcP, [string]$dstP) {
@@ -1942,6 +1943,29 @@ function Test-ModInfoExists([string]$dirPath) {
 }
 function Test-PathLong([string]$p) {
   try { return ([IO.Directory]::Exists((Get-LongPath $p)) -or [IO.File]::Exists((Get-LongPath $p))) } catch { return $false }
+}
+function Get-ModInfoDirs([string]$root) {
+  # Every folder under $root that contains a mod.info, as
+  # DirectoryInfo objects. Get-ChildItem -Recurse cannot enumerate
+  # trees whose paths pass the Windows limit - it silently skips
+  # those subtrees, so deeply-nested mods looked like empty
+  # downloads. This walk uses .NET enumeration from a
+  # long-path-prefixed root, with each directory isolated so one
+  # bad branch never stops the rest.
+  $out = @()
+  if (-not (Test-Path $root)) { return $out }
+  $stack = New-Object System.Collections.Stack
+  $stack.Push((Get-LongPath $root))
+  while ($stack.Count -gt 0) {
+    $cur = [string]$stack.Pop()
+    $subs = @()
+    try { $subs = @([IO.Directory]::EnumerateDirectories($cur)) } catch { continue }
+    foreach ($d in $subs) {
+      if ([IO.File]::Exists((Join-Path $d 'mod.info'))) { $out += (New-Object IO.DirectoryInfo($d)) }
+      $stack.Push($d)
+    }
+  }
+  return $out
 }
 
 function Complete-InstallModCore([string]$WorkshopId, [string]$Name, $keptDirs, $carryVariants, $droppedIds, $prop0, [string]$src, [switch]$SkipPreCheck) {
@@ -1996,10 +2020,17 @@ function Complete-InstallModCore([string]$WorkshopId, [string]$Name, $keptDirs, 
       if ($mid -match '^[A-Za-z0-9_.\-]+$') { $dirName = $mid }
       else { $dirName = ($WorkshopId + '_' + $m.Name) }
     }
+    if ($dirName.Length -gt 100) {
+      # A pathologically long folder name overflows the Windows
+      # path limit for everything inside it; install under the
+      # Mod ID instead (the game reads the ID from mod.info).
+      $midCap = Get-ModInfoId (Join-Path $m.FullName 'mod.info')
+      if ($midCap -match '^[A-Za-z0-9_.\-]+$' -and $midCap.Length -le 100) { $dirName = $midCap } else { $dirName = $WorkshopId }
+    }
     if ($usedNames.ContainsKey($dirName)) { $dirName = ($dirName + '_' + $m.Name) }
     $usedNames[$dirName] = $true
     $dest = Join-Path $ModsDir $dirName
-    if (Test-Path $dest) { Remove-ModFolder $dest }
+    Remove-ModFolder $dest
     $isVerFolder = $m.Name -match '^(?i)(\d{2}(\.\d+)?)$'
     $isCommonFolder = $m.Name -match '^(?i)common$'
     if ($isVerFolder -or $isCommonFolder) {
@@ -2017,7 +2048,7 @@ function Complete-InstallModCore([string]$WorkshopId, [string]$Name, $keptDirs, 
       Copy-ModFolder $m.FullName $dest
       Write-Host ("  Installed: " + $dirName) -ForegroundColor DarkGray
     }
-    if (-not (Test-Path (Join-Path $dest 'mod.info'))) {
+    if (-not (Test-ModInfoExists $dest)) {
       $script:InstallFailReason = 'The copy into the game folder failed verification (no mod.info at the destination)'
       Write-Host ("  FAILED: copy failed for " + $m.Name + " - not recorded as installed") -ForegroundColor Red
       return $false
@@ -2351,17 +2382,25 @@ function Install-Mod([string]$WorkshopId, [string]$Name) {
     }
   }
   $modsFound = @()
-  if (Test-Path $src) { $modsFound = @(Get-ChildItem $src -Recurse | Where-Object { $_.PSIsContainer } | Where-Object { Test-ModInfoExists $_.FullName }) }
+  if (Test-Path $src) { $modsFound = @(Get-ModInfoDirs $src) }
   if ($modsFound.Count -eq 0) {
     # Download with retries - SteamCMD anonymous sometimes returns
     # empty on the first tries, large items especially. The last
     # attempt clears the item cache first: a partial download left
     # in the cache can make every later attempt fail the same way.
     for ($attempt = 1; $attempt -le 3; $attempt++) {
-      if ($attempt -eq 3 -and (Test-Path $src)) { Write-Host '  Clearing the stuck download cache before the final attempt...' -ForegroundColor Yellow; Remove-Item $src -Recurse -Force -ErrorAction SilentlyContinue }
+      if ($attempt -eq 3) {
+        Write-Host '  Clearing the stuck download cache before the final attempt...' -ForegroundColor Yellow
+        if (Test-Path $src) { Remove-Item $src -Recurse -Force -ErrorAction SilentlyContinue }
+        $wsRoot = Join-Path (Join-Path $SteamCmdDir 'steamapps') 'workshop'
+        $stageDir = Join-Path (Join-Path $wsRoot 'downloads') (Join-Path $AppId $WorkshopId)
+        if (Test-Path $stageDir) { Remove-Item $stageDir -Recurse -Force -ErrorAction SilentlyContinue }
+        $acfPath = Join-Path $wsRoot ('appworkshop_' + $AppId + '.acf')
+        if (Test-Path $acfPath) { Remove-Item $acfPath -Force -ErrorAction SilentlyContinue }
+      }
       Write-Host ("  Downloading [" + $Name + "] (attempt " + $attempt + "/3)...") -ForegroundColor DarkCyan
       $scOut = Invoke-SteamCmd @('+login', 'anonymous', '+workshop_download_item', $AppId, $WorkshopId, 'validate', '+quit')
-      if (Test-Path $src) { $modsFound = @(Get-ChildItem $src -Recurse | Where-Object { $_.PSIsContainer } | Where-Object { Test-ModInfoExists $_.FullName }) }
+      if (Test-Path $src) { $modsFound = @(Get-ModInfoDirs $src) }
       if ($modsFound.Count -gt 0) { break }
       # Still empty after this attempt - on final attempt show SteamCMD errors for diagnosis
       if ($attempt -eq 3) {
@@ -2408,7 +2447,7 @@ function Install-Mod([string]$WorkshopId, [string]$Name) {
       if ($szSum2 -and [long]$szSum2 -lt ($expectedSize * 0.95)) {
         Write-Host ("  WARNING: download still incomplete after retries (" + [long]$szSum2 + " of " + $expectedSize + " bytes) - installing what is available.") -ForegroundColor Yellow
       }
-      $modsFound = @(Get-ChildItem $src -Recurse | Where-Object { $_.PSIsContainer } | Where-Object { Test-ModInfoExists $_.FullName })
+      $modsFound = @(Get-ModInfoDirs $src)
     }
   }
   if ($modsFound.Count -eq 0) { $script:InstallFailReason = 'No mod folder found in the downloaded files'; Write-Host ("  WARNING: no mod found inside " + $WorkshopId) -ForegroundColor Yellow; return $false }
@@ -2609,7 +2648,7 @@ function Repair-InstallRecords {
       # download cache, the same scan Install-Mod performs.
       $cacheSrc = Join-Path (Join-Path (Join-Path $SteamCmdDir 'steamapps') 'workshop') ("content\" + $AppId + "\" + $wid)
       if (Test-Path $cacheSrc) {
-        foreach ($vd in @(Get-ChildItem $cacheSrc -Recurse -ErrorAction SilentlyContinue | Where-Object { $_.PSIsContainer } | Where-Object { Test-ModInfoExists $_.FullName })) {
+        foreach ($vd in @(Get-ModInfoDirs $cacheSrc)) {
           $dn = [string]$vd.Name
           if ($dn -match '^(?i)(\d{10}([_.].*)?|\d+(\.\d+)*(_\d+(\.\d+)*)?|common|mods?|main|default)$') {
             $mid = Get-ModInfoId (Join-Path $vd.FullName 'mod.info')
@@ -2737,7 +2776,7 @@ function Find-ModUpdates {
     if ($id -notmatch '^\d+$') { continue }
     $src = Join-Path (Join-Path (Join-Path $SteamCmdDir 'steamapps') 'workshop') ('content\' + $AppId + '\' + $id)
     if (-not (Test-Path $src)) { continue }
-    $folders = @(Get-ChildItem $src -Recurse | Where-Object { $_.PSIsContainer } | Where-Object { Test-ModInfoExists $_.FullName })
+    $folders = @(Get-ModInfoDirs $src)
     if ($folders.Count -eq 0) { continue }
     $prop = $map.PSObject.Properties[$id]
     $stamp = Get-FoldersStamp $folders
@@ -2767,7 +2806,7 @@ function Install-FoundUpdates($updates, $map) {
     if ($id -notmatch '^\d+$') { continue }
     $src = Join-Path (Join-Path (Join-Path $SteamCmdDir 'steamapps') 'workshop') ('content\' + $AppId + '\' + $id)
     if (-not (Test-Path $src)) { continue }
-    $folders = @(Get-ChildItem $src -Recurse | Where-Object { $_.PSIsContainer } | Where-Object { Test-ModInfoExists $_.FullName })
+    $folders = @(Get-ModInfoDirs $src)
     if ($folders.Count -eq 0) { continue }
     $prop = $map.PSObject.Properties[$id]
     $stamp = Get-FoldersStamp $folders
@@ -2823,7 +2862,7 @@ function Install-FoundUpdates($updates, $map) {
       if ($usedNames.ContainsKey($dirName)) { $dirName = ($dirName + '_' + $f.Name) }
       $usedNames[$dirName] = $true
       $dest = Join-Path $ModsDir $dirName
-      if (Test-Path $dest) { Remove-ModFolder $dest }
+      Remove-ModFolder $dest
       $isVerFolder = $f.Name -match '^(?i)(\d{2}(\.\d+)?)$'
       $isCommonFolder = $f.Name -match '^(?i)common$'
       if ($isVerFolder -or $isCommonFolder) {
