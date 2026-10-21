@@ -1,7 +1,7 @@
 # PZ Mod Manager - Created by duy64. Licensed under the MIT License (see LICENSE.txt).
 #Requires -Version 5.1
 <#
-  PZ Mod Manager v454 - B42 Essentials: mod pack for Single-Player & Multiplayer
+  PZ Mod Manager v455 - B42 Essentials: mod pack for Single-Player & Multiplayer
   Full collection (~190 mods) + Cheat Menu: Rebuild, no Steam client needed.
 #>
 $ErrorActionPreference = 'Stop'
@@ -17,7 +17,7 @@ $NL          = [Environment]::NewLine
 # Target game build. B43 = change these lines; the layout repair and [10] checks derive from them.
 $GameBuild = '42'      # major build: version folder name (42/)
 $GameBuildFull = '42.21'  # current full build: versionMax floor for [10] warnings
-$ScriptVersion = '454'    # app version: shown in the menu header + GUI title
+$ScriptVersion = '455'    # app version: shown in the menu header + GUI title
 
 # All known categories, including ones with zero mods right now (Maps /
 # Audio / Zombies have no catalog mods yet). The category editor lists
@@ -1937,7 +1937,45 @@ function Remove-ModFolder([string]$p) {
   catch { Remove-Item $p -Recurse -Force -ErrorAction SilentlyContinue }
 }
 function Copy-ModFolder([string]$srcP, [string]$dstP) {
-  Copy-Item (Get-LongPath $srcP) (Get-LongPath $dstP) -Recurse -Force
+  # Pure .NET recursive copy on long-path-prefixed paths.
+  # Copy-Item interprets brackets and other provider-special
+  # characters in file and folder names, which killed the copy
+  # for mods whose trees contain them (BMP-2, M60A3 Tank,
+  # Material Weight Reducer: 'filename syntax is incorrect').
+  # Raw .NET IO treats every name literally. A failed file does
+  # not stop the rest; the first error is rethrown at the end so
+  # the install still reports failed rather than partial.
+  $srcL = Get-LongPath $srcP
+  $dstL = Get-LongPath $dstP
+  if (-not [IO.Directory]::Exists($srcL)) { return }
+  [IO.Directory]::CreateDirectory($dstL) | Out-Null
+  $copyErr = $null
+  $stack = New-Object System.Collections.Stack
+  $stack.Push(@($srcL, $dstL))
+  while ($stack.Count -gt 0) {
+    $pair = $stack.Pop()
+    $sDir = [string]$pair[0]
+    $dDir = [string]$pair[1]
+    $files = @()
+    try { $files = @([IO.Directory]::EnumerateFiles($sDir)) } catch { if (-not $copyErr) { $copyErr = $_ } }
+    foreach ($f in $files) {
+      try {
+        $destFile = $dDir + '\' + [IO.Path]::GetFileName($f)
+        [IO.File]::Copy($f, $destFile, $true)
+        try { [IO.File]::SetAttributes($destFile, [IO.FileAttributes]::Normal) } catch { }
+      } catch { if (-not $copyErr) { $copyErr = $_ } }
+    }
+    $subs = @()
+    try { $subs = @([IO.Directory]::EnumerateDirectories($sDir)) } catch { if (-not $copyErr) { $copyErr = $_ } }
+    foreach ($sub in $subs) {
+      try {
+        $subDest = $dDir + '\' + [IO.Path]::GetFileName($sub)
+        [IO.Directory]::CreateDirectory($subDest) | Out-Null
+        $stack.Push(@($sub, $subDest))
+      } catch { if (-not $copyErr) { $copyErr = $_ } }
+    }
+  }
+  if ($copyErr) { throw $copyErr }
 }
 function Test-ModInfoExists([string]$dirPath) {
   # Test-Path THROWS PathTooLongException on paths over the Windows
@@ -2114,7 +2152,7 @@ function Complete-InstallModCore([string]$WorkshopId, [string]$Name, $keptDirs, 
         if (Test-Path (Join-Path $destDir $cand.Name)) { continue }
         if ($modSrc -like ($cand.FullName + '\*')) { continue }
         if (@(Get-ChildItem $cand.FullName -Recurse -Filter 'mod.info' -ErrorAction SilentlyContinue | Where-Object { -not $_.PSIsContainer } | Select-Object -First 1).Count -gt 0) { continue }
-        Copy-Item $cand.FullName $destDir -Recurse -Force
+        Copy-ModFolder $cand.FullName $destDir
         Write-Host ("  Rescued sibling content '" + $cand.Name + "' into " + $dn) -ForegroundColor Cyan
       }
     }
@@ -2885,7 +2923,7 @@ function Install-FoundUpdates($updates, $map) {
         if (-not (Test-Path $rootInfo)) { [void](Copy-Item (Join-Path $f.FullName 'mod.info') $rootInfo -Force) }
         Write-Host ("  Updated (B" + $GameBuild + " layout, kept common/ + version folders): " + $dirName) -ForegroundColor DarkGray
       } else {
-        [void](Copy-Item $f.FullName $dest -Recurse -Force)
+        Copy-ModFolder $f.FullName $dest
         Write-Host ("  Updated: " + $dirName) -ForegroundColor DarkGray
       }
       $finalNames += $dirName
