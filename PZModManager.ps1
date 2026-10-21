@@ -1,7 +1,7 @@
 # PZ Mod Manager - Created by duy64. Licensed under the MIT License (see LICENSE.txt).
 #Requires -Version 5.1
 <#
-  PZ Mod Manager v453 - B42 Essentials: mod pack for Single-Player & Multiplayer
+  PZ Mod Manager v454 - B42 Essentials: mod pack for Single-Player & Multiplayer
   Full collection (~190 mods) + Cheat Menu: Rebuild, no Steam client needed.
 #>
 $ErrorActionPreference = 'Stop'
@@ -17,7 +17,7 @@ $NL          = [Environment]::NewLine
 # Target game build. B43 = change these lines; the layout repair and [10] checks derive from them.
 $GameBuild = '42'      # major build: version folder name (42/)
 $GameBuildFull = '42.21'  # current full build: versionMax floor for [10] warnings
-$ScriptVersion = '453'    # app version: shown in the menu header + GUI title
+$ScriptVersion = '454'    # app version: shown in the menu header + GUI title
 
 # All known categories, including ones with zero mods right now (Maps /
 # Audio / Zombies have no catalog mods yet). The category editor lists
@@ -83,6 +83,7 @@ $Mods = @(
   # ---------- FRAMEWORKS (installed first) ----------
   @{ Name='that DAMN Library (KI5 framework)'; WorkshopId='3171167894'; Cat='Frameworks' },
   @{ Name='Elyon Lib'; WorkshopId='3384377738'; Cat='Frameworks' },
+  @{ Name='Gunworks Framework'; WorkshopId='3722064198'; Cat='Frameworks' },
   @{ Name="Tsar's Common Library B42"; WorkshopId='3402491515'; Cat='Frameworks' },
   @{ Name='NeatUI Framework [B42]'; WorkshopId='3508537032'; Cat='Frameworks' },
   @{ Name='Starlit Library'; WorkshopId='3378285185'; Cat='Frameworks' },
@@ -1792,6 +1793,7 @@ $DepMap = @{
   '3005903549' = @('3171167894')   # '63 Volkswagen 1300 Beetle -> that DAMN Library
   '3017885370' = @('2897536185')   # Totally's American Firearms -> Totally's Historical Firearms Pack - Core
   '3772269882' = @('3384377738')   # Knox Buildworks -> Elyon Lib
+  '3773834525' = @('3722064198')   # Vanilla Weapons PLUS -> Gunworks Framework
 }
 # ModID -> WorkshopID for generic require= resolution (when a mod needs a dep not in DepMap)
 $ModIdToWorkshop = @{
@@ -1807,6 +1809,7 @@ $ModIdToWorkshop = @{
   'TIHFP' = '2897536185'
   'TIHFPClassic' = '2897536185'
   'ElyonLib' = '3384377738'
+  'SWMG' = '3722064198'
   '63beetle' = '3005903549'
   '63beetleBuggy' = '3005903549'
   '63beetleHP' = '3005903549'
@@ -3925,6 +3928,17 @@ function Move-GuiSelectedMods {
 }
 
 
+function Get-ErrorReason($err) {
+  # 'Error: <message> [function, file: line N]' - the stack top
+  # names the exact throw site, so the batch failure dialog
+  # pinpoints a failure without a separate error-dump round trip.
+  $r = 'Error: ' + $err.Exception.Message
+  try {
+    $top = (($err.ScriptStackTrace -split "`n")[0]).Trim()
+    if ($top) { $r += ' [' + ($top -replace '^at ', '') + ']' }
+  } catch { }
+  return $r
+}
 function Write-GuiErrorDump($err, [string]$where) {
   # Full error record for gui-error.txt: type, message, the exact
   # failing line, and the stack AT THE CATCH SITE (the main Show-Gui
@@ -5875,7 +5889,7 @@ function Install-GuiSelectedMods {
     $inMods[[string]$m.WorkshopId] = $true
     $n++; Show-GuiInstallProgress $n $ids.Count $m.Name $start 'Installing'
     $r = $false
-    try { $r = Install-Mod $m.WorkshopId $m.Name } catch { Write-GuiErrorDump $_ ('InstallMod ' + [string]$m.WorkshopId); $script:BatchFailReasons[[string]$m.WorkshopId] = ('Error: ' + $_.Exception.Message) }
+    try { $r = Install-Mod $m.WorkshopId $m.Name } catch { Write-GuiErrorDump $_ ('InstallMod ' + [string]$m.WorkshopId); $script:BatchFailReasons[[string]$m.WorkshopId] = (Get-ErrorReason $_) }
     if ($r -eq $true) { $ok++ } elseif ($r -eq $false -and -not $script:BatchFailReasons.ContainsKey([string]$m.WorkshopId)) { $frNow = 'Install failed'; if ($script:InstallFailReason) { $frNow = [string]$script:InstallFailReason }; $script:BatchFailReasons[[string]$m.WorkshopId] = $frNow }
     if ($script:AbortVariantBatch) { break }
   }
@@ -5883,7 +5897,7 @@ function Install-GuiSelectedMods {
   # still install, using the stored name.
   foreach ($id in $ids) {
     if ($script:AbortVariantBatch) { break }
-    if (-not $inMods.ContainsKey($id)) { $n++; Show-GuiInstallProgress $n $ids.Count $script:GuiSelectedMods[$id] $start 'Installing'; $r2 = $false; try { $r2 = Install-Mod $id $script:GuiSelectedMods[$id] } catch { Write-GuiErrorDump $_ ('InstallMod ' + [string]$id); $script:BatchFailReasons[[string]$id] = ('Error: ' + $_.Exception.Message) }; if ($r2 -eq $true) { $ok++ } elseif ($r2 -eq $false -and -not $script:BatchFailReasons.ContainsKey([string]$id)) { $frNow = 'Install failed'; if ($script:InstallFailReason) { $frNow = [string]$script:InstallFailReason }; $script:BatchFailReasons[[string]$id] = $frNow } }
+    if (-not $inMods.ContainsKey($id)) { $n++; Show-GuiInstallProgress $n $ids.Count $script:GuiSelectedMods[$id] $start 'Installing'; $r2 = $false; try { $r2 = Install-Mod $id $script:GuiSelectedMods[$id] } catch { Write-GuiErrorDump $_ ('InstallMod ' + [string]$id); $script:BatchFailReasons[[string]$id] = (Get-ErrorReason $_) }; if ($r2 -eq $true) { $ok++ } elseif ($r2 -eq $false -and -not $script:BatchFailReasons.ContainsKey([string]$id)) { $frNow = 'Install failed'; if ($script:InstallFailReason) { $frNow = [string]$script:InstallFailReason }; $script:BatchFailReasons[[string]$id] = $frNow } }
   }
   # Consolidated picker: decide ALL deferred multi-variant mods at once.
   # Batch mode is OFF for the complete phase (its dependency installs
@@ -5903,7 +5917,7 @@ function Install-GuiSelectedMods {
         if (-not $dec) { $dec = @{ KeptIndices = @(0..(@($pd.VariantDirs).Count - 1)); KeptIds = @($pd.Candidates | ForEach-Object { [string]$_.WorkshopId }) } }
         if ($dec -and @($dec.KeptIndices).Count -eq 0) { $script:BatchUserSkipped += [string]$pd.WorkshopId }
         $cdi = $false
-        try { $cdi = Complete-DeferredInstall $pd $dec } catch { Write-GuiErrorDump $_ ('CompleteDeferred ' + [string]$pd.WorkshopId); $script:BatchFailReasons[[string]$pd.WorkshopId] = ('Error: ' + $_.Exception.Message) }
+        try { $cdi = Complete-DeferredInstall $pd $dec } catch { Write-GuiErrorDump $_ ('CompleteDeferred ' + [string]$pd.WorkshopId); $script:BatchFailReasons[[string]$pd.WorkshopId] = (Get-ErrorReason $_) }
         if ($cdi -eq $true) { $ok++ } elseif ($cdi -eq $false -and -not $script:BatchFailReasons.ContainsKey([string]$pd.WorkshopId)) { $frNow = 'Install failed'; if ($script:InstallFailReason) { $frNow = [string]$script:InstallFailReason }; $script:BatchFailReasons[[string]$pd.WorkshopId] = $frNow }
       }
     }
@@ -5929,7 +5943,7 @@ function Install-GuiSelectedMods {
       foreach ($sel in @($pcRes.Selected)) {
         $pf = @($preFailed | Where-Object { [string]$_.WorkshopId -eq [string]$sel.WorkshopId })[0]
         $cic = $false
-        if ($pf) { try { $cic = Complete-InstallModCore [string]$pf.WorkshopId [string]$pf.Name @($pf.KeptDirs) @($pf.CarryVariants) @($pf.DroppedIds) $pf.Prop0 [string]$pf.Src -SkipPreCheck } catch { Write-GuiErrorDump $_ ('CompletePreCheck ' + [string]$pf.WorkshopId); $script:BatchFailReasons[[string]$pf.WorkshopId] = ('Error: ' + $_.Exception.Message) } }
+        if ($pf) { try { $cic = Complete-InstallModCore [string]$pf.WorkshopId [string]$pf.Name @($pf.KeptDirs) @($pf.CarryVariants) @($pf.DroppedIds) $pf.Prop0 [string]$pf.Src -SkipPreCheck } catch { Write-GuiErrorDump $_ ('CompletePreCheck ' + [string]$pf.WorkshopId); $script:BatchFailReasons[[string]$pf.WorkshopId] = (Get-ErrorReason $_) } }
         if ($cic -eq $true) { $ok++ } elseif ($cic -eq $false -and -not $script:BatchFailReasons.ContainsKey([string]$pf.WorkshopId)) { $frNow = 'Install failed'; if ($script:InstallFailReason) { $frNow = [string]$script:InstallFailReason }; $script:BatchFailReasons[[string]$pf.WorkshopId] = $frNow }
       }
     }
