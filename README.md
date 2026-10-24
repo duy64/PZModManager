@@ -4,6 +4,8 @@ A simple and easy-to-use tool designed to help players manage, organize, and ins
 
 No Steam client required — mods download directly via SteamCMD.
 
+![PZ Mod Manager](screenshot.png)
+
 ---
 
 ## Download
@@ -29,7 +31,7 @@ No Steam client required — mods download directly via SteamCMD.
 ## Features
 
 ### Mod Management
-- 219-mod curated catalog for Project Zomboid B42
+- 214-mod curated catalog for Project Zomboid B42
 - Install / uninstall mods, single or in bulk
 - Check for mod updates
 - Add mods by Workshop ID, URL, or built-in Workshop search
@@ -37,7 +39,7 @@ No Steam client required — mods download directly via SteamCMD.
 
 ### Packs & Categories
 - 23 ready-made mod packs (Vehicles, Weapons, NPCs, Quality of Life, and more)
-- 20 categories for organizing your mods
+- 18 categories for organizing your mods
 - Create your own custom packs and categories
 
 ### Lists (Profiles)
