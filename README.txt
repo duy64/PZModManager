@@ -1,4 +1,4 @@
-PZ MOD MANAGER v464
+PZ MOD MANAGER v473
 Created by duy64. Licensed under the MIT License (see LICENSE.txt).
 
 WHAT IT IS
@@ -16,6 +16,6 @@ FEATURES
   - Mods / Packs / Categories / Lists tabs. Lists are full profiles (mods + packs + categories).
   - Tools menu: Check For Mod Updates, Compatibility Report, Manage Variants, Add Existing Mods, View Mod's Page, Workshop Home Page, Clear Cache, About.
   - Workshop ID validation on Add. Safeguard prompt before every destructive action.
-  - Built-in catalog: 219 B42 mods in 12 categories - duy64's curated list. Add or remove mods to make it yours.
+  - Built-in catalog: 375 B42 mods in 19 categories - duy64's curated list. Add or remove mods to make it yours.
 
 Full version history in CHANGELOG.txt.
