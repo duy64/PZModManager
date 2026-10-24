@@ -1,11 +1,11 @@
 # PZ Mod Manager - Created by duy64. Licensed under the MIT License (see LICENSE.txt).
 #Requires -Version 5.1
 <#
-  PZ Mod Manager v464 - B42 Essentials: mod pack for Single-Player & Multiplayer
-  Full collection (~190 mods) + Cheat Menu: Rebuild, no Steam client needed.
+  PZ Mod Manager v473 - B42 Essentials: mod pack for Single-Player & Multiplayer
+  Full collection (~375 mods) + Cheat Menu: Rebuild, no Steam client needed.
 #>
 $ErrorActionPreference = 'Stop'
-$ScriptVersion = '2026-10-12'
+$ScriptVersion = '2026-10-24'
 
 $ModsDir     = Join-Path $env:USERPROFILE 'Zomboid\mods'
 $ToolsDir    = Join-Path $PSScriptRoot 'tools'
@@ -17,7 +17,7 @@ $NL          = [Environment]::NewLine
 # Target game build. B43 = change these lines; the layout repair and [10] checks derive from them.
 $GameBuild = '42'      # major build: version folder name (42/)
 $GameBuildFull = '42.21'  # current full build: versionMax floor for [10] warnings
-$ScriptVersion = '464'    # app version: shown in the menu header + GUI title
+$ScriptVersion = '473'    # app version: shown in the menu header + GUI title
 
 # All known categories, including ones with zero mods right now (Maps /
 # Audio / Zombies have no catalog mods yet). The category editor lists
@@ -95,6 +95,8 @@ $Mods = @(
   @{ Name='[B42] Aviation Core (helicopter framework)'; WorkshopId='3783444342'; Cat='Frameworks' },
   @{ Name='Yet Another PZ Library (YAPZLib)'; WorkshopId='3624971238'; Cat='Frameworks' },
   @{ Name='Moodle Framework (Dynamic Traits dependency)'; WorkshopId='3396446795'; Cat='Frameworks' },
+  @{ Name='B42 Native ModOptions Example'; WorkshopId='3386860561'; Cat='Frameworks' },
+  @{ Name='[B42] ZombieBuddy Extensions'; WorkshopId='3807686870'; Cat='Frameworks' },
 
   # ---------- VEHICLES ----------
   @{ Name="'04 Volkswagen Touran"; WorkshopId='3478633453'; Cat='Vehicles' },
@@ -169,6 +171,48 @@ $Mods = @(
   @{ Name='[B42] M1 Abrams'; WorkshopId='3397147307'; Cat='Vehicles' },
   @{ Name="Maskarad's Summer Car"; WorkshopId='3790160840'; Cat='Vehicles' },
   @{ Name='[B42] UH-1B Helicopter (Beta, flyable)'; WorkshopId='3409723807'; Cat='Aircrafts' },
+  @{ Name='[B42]Project RV Interior'; WorkshopId='3543229299'; Cat='Vehicles' },
+  @{ Name='[B42.20+] Vehicle Aim Roof Fix'; WorkshopId='3781616141'; Cat='Vehicles' },
+  @{ Name='[B42MP] FlipVehiclePlusTrailer'; WorkshopId='3430172149'; Cat='Vehicles' },
+  @{ Name="'69 Dodge Charger"; WorkshopId='3631989559'; Cat='Vehicles' },
+  @{ Name="'70 Plymouth Road Runner"; WorkshopId='3642935062'; Cat='Vehicles' },
+  @{ Name="'84 Buick Electra"; WorkshopId='3596903773'; Cat='Vehicles' },
+  @{ Name="'84 Cadillac DeVille"; WorkshopId='3592777775'; Cat='Vehicles' },
+  @{ Name="'85 Chevrolet Step-Van"; WorkshopId='3614034284'; Cat='Vehicles' },
+  @{ Name="'89 LAND ROVER Defender"; WorkshopId='3570973322'; Cat='Vehicles' },
+  @{ Name="'95 Subaru Impreza WRX STI"; WorkshopId='3647735736'; Cat='Vehicles' },
+  @{ Name="'96 Mitsubishi Lancer EVO IV"; WorkshopId='3647736504'; Cat='Vehicles' },
+  @{ Name='Lock-Mart Industries M577'; WorkshopId='3652371248'; Cat='Vehicles' },
+  @{ Name="'63 Volkswagen Type 2 Van"; WorkshopId='3041122351'; Cat='Vehicles' },
+  @{ Name="'99 Ford Crown Victoria Police Interceptor"; WorkshopId='2971246021'; Cat='Vehicles' },
+  @{ Name="'97 ADI Bushmaster"; WorkshopId='2897390033'; Cat='Vehicles' },
+  @{ Name="'98 Nissan Stagea 260RS Autech"; WorkshopId='3315443103'; Cat='Vehicles' },
+  @{ Name="'70 Ford Escort"; WorkshopId='3670063857'; Cat='Vehicles' },
+  @{ Name='Campers!'; WorkshopId='3670064951'; Cat='Vehicles' },
+  @{ Name="'65 Pontiac Banshee"; WorkshopId='3566868353'; Cat='Vehicles' },
+  @{ Name="'91 Ford Ranger"; WorkshopId='3539691958'; Cat='Vehicles' },
+  @{ Name="'96 Saturn S Series"; WorkshopId='3679880253'; Cat='Vehicles' },
+  @{ Name="'84 Chevrolet Corvette"; WorkshopId='3684254299'; Cat='Vehicles' },
+  @{ Name="'89 Ford Bronco"; WorkshopId='2886833398'; Cat='Vehicles' },
+  @{ Name="'88 Chevrolet S10"; WorkshopId='2886832936'; Cat='Vehicles' },
+  @{ Name="'82 Jeep J10"; WorkshopId='2886832257'; Cat='Vehicles' },
+  @{ Name="'79 Chevrolet Camaro"; WorkshopId='3703948448'; Cat='Vehicles' },
+  @{ Name='Cobb Motor Company M540'; WorkshopId='3722240318'; Cat='Vehicles' },
+  @{ Name="'78 AM General M35 Series Trucks"; WorkshopId='2799152995'; Cat='Vehicles' },
+  @{ Name="'78 Lamborghini Countach"; WorkshopId='3726526329'; Cat='Vehicles' },
+  @{ Name="'76 Chrysler New Yorker"; WorkshopId='3730833846'; Cat='Vehicles' },
+  @{ Name="'82 Oshkosh M911 + Military Semi-Trailers"; WorkshopId='2618213077'; Cat='Vehicles' },
+  @{ Name="'73 NISSAN Skyline GT-R"; WorkshopId='3743371090'; Cat='Vehicles' },
+  @{ Name="'69 Ford Mustang"; WorkshopId='3756938756'; Cat='Vehicles' },
+  @{ Name="'70 Chevrolet Chevelle / El Camino"; WorkshopId='3766571591'; Cat='Vehicles' },
+  @{ Name="'91 Lexus LS400"; WorkshopId='3770890864'; Cat='Vehicles' },
+  @{ Name="'87 Toyota Corolla AE92"; WorkshopId='3779315249'; Cat='Vehicles' },
+  @{ Name="'62 Daimler Ferret"; WorkshopId='3787530735'; Cat='Vehicles' },
+  @{ Name="'84 Cadillac Gage LAV-300"; WorkshopId='3171184800'; Cat='Vehicles' },
+  @{ Name="'83 AM General M923"; WorkshopId='2811383142'; Cat='Vehicles' },
+  @{ Name="'83 GMC G-Series Vans"; WorkshopId='3799732653'; Cat='Vehicles' },
+  @{ Name="'92 Volkswagen Golf Mk2"; WorkshopId='3812024929'; Cat='Vehicles' },
+  @{ Name="'67 Chevrolet Impala"; WorkshopId='3820938264'; Cat='Vehicles' },
 
   # ---------- Quality of Life Mods ----------
   @{ Name='Common Sense [B42.20+]'; WorkshopId='3750253491'; Cat='Quality of Life Mods' },
@@ -200,7 +244,7 @@ $Mods = @(
   @{ Name='[B42] Arcade Machines'; WorkshopId='3398916952'; Cat='Content Mods' },
   @{ Name='Map Mod Manager'; WorkshopId='3360392628'; Cat='Map Tools' },
   @{ Name='Craft Helper Continued'; WorkshopId='2787291513'; Cat='Crafting' },
-  @{ Name='Auto Reload'; WorkshopId='3389448389'; Cat='Crafting' },
+  @{ Name='Auto Reload'; WorkshopId='3389448389'; Cat='Weapons' },
   @{ Name='Auto Mechanics'; WorkshopId='3387539308'; Cat='Crafting' },
   @{ Name='Grab and Drop'; WorkshopId='3018929461'; Cat='Movement' },
   @{ Name='Climb'; WorkshopId='3389681224'; Cat='Movement' },
@@ -243,7 +287,7 @@ $Mods = @(
   @{ Name='On the Door'; WorkshopId='3056481712'; Cat='Quality of Life Mods' },
   @{ Name='zRe Fix Floor'; WorkshopId='3021358003'; Cat='Quality of Life Mods' },
   @{ Name="Cat's eye in the Dark"; WorkshopId='3402513620'; Cat='Quality of Life Mods' },
-  @{ Name='ShaderZ'; WorkshopId='3419026942'; Cat='Quality of Life Mods' },
+  @{ Name='ShaderZ'; WorkshopId='3419026942'; Cat='Graphics' },
   @{ Name='Better Flashlights'; WorkshopId='2766033079'; Cat='Quality of Life Mods' },
   @{ Name='[B42+] Sandbox Options'; WorkshopId='3386906181'; Cat='Quality of Life Mods' },
   @{ Name='[B42.20] Carry Visible Items In Hands [WIP]'; WorkshopId='3749026793'; Cat='Inventory' },
@@ -261,18 +305,18 @@ $Mods = @(
   @{ Name='Project A-Life [ALIFE NPCS]'; WorkshopId='3803984183'; Cat='NPCs' },
   @{ Name='Project Viewpoint'; WorkshopId='3809306528'; Cat='Graphics' },
   @{ Name='Smokes and Guns'; WorkshopId='3439278895'; Cat='Content Mods' },
-  @{ Name='Simple Silencers'; WorkshopId='3309896124'; Cat='Content Mods' },
+  @{ Name='Simple Silencers'; WorkshopId='3309896124'; Cat='Weapons' },
   @{ Name="Advanced Trajectory's Realistic Overhaul"; WorkshopId='3036878362'; Cat='Content Mods' },
   @{ Name='b42 BonzBetterCombat'; WorkshopId='3391690547'; Cat='Content Mods' },
   @{ Name='Barricade Hurt Zombies'; WorkshopId='2913137598'; Cat='Content Mods' },
   @{ Name='Cheval de frise'; WorkshopId='2927800433'; Cat='Content Mods' },
   @{ Name='Long-standing Metal Constructions'; WorkshopId='3199474685'; Cat='Content Mods' },
   @{ Name='BasedBackpack'; WorkshopId='2992829394'; Cat='Clothing & Gear' },
-  @{ Name="Alice's Weapon Sling [B42.20]"; WorkshopId='3775549570'; Cat='Content Mods' },
+  @{ Name="Alice's Weapon Sling [B42.20]"; WorkshopId='3775549570'; Cat='Clothing & Gear' },
   @{ Name='Vanilla Clothing Expansion'; WorkshopId='3421271152'; Cat='Clothing & Gear' },
   @{ Name='Vanilla Gear Expanded'; WorkshopId='3401134276'; Cat='Clothing & Gear' },
   @{ Name='[B42] Immersive Camos'; WorkshopId='3454414190'; Cat='Clothing & Gear' },
-  @{ Name='Improved Blood Effects'; WorkshopId='2648152698'; Cat='Content Mods' },
+  @{ Name='Improved Blood Effects'; WorkshopId='2648152698'; Cat='Graphics' },
   @{ Name='Decoholic'; WorkshopId='3197857648'; Cat='Content Mods' },
   @{ Name="Pillow's Random Spawns [B42]"; WorkshopId='1911132112'; Cat='Content Mods' },
   @{ Name='Dynamic Traits and Expanded Moodles'; WorkshopId='2459400130'; Cat='Content Mods' },
@@ -312,7 +356,139 @@ $Mods = @(
   @{ Name='Extraction Mode'; WorkshopId='3785397275'; Cat='Events' },
   @{ Name='Plane Crash Event (WORKING FOR B42.21) (VIEWPOINT)'; WorkshopId='3773663869'; Cat='Events' },
   @{ Name='Dark Presence'; WorkshopId='3774351457'; Cat='Events' },
-  @{ Name='Sun Is Gone [SP/MP]'; WorkshopId='3787603803'; Cat='Events' }
+  @{ Name='Sun Is Gone [SP/MP]'; WorkshopId='3787603803'; Cat='Events' },
+
+  # ---------- ADDED IN v473: the Default list joins the catalog ----------
+  # --- Weapons ---
+  @{ Name='B42 Real Firearms [Upd #51.1] WIP'; WorkshopId='3238830225'; Cat='Weapons' },
+  @{ Name="B42 Rain's Firearms & Gun Parts"; WorkshopId='3773858287'; Cat='Weapons' },
+  @{ Name="[B42] Noir's Rifle Slings"; WorkshopId='3388107363'; Cat='Weapons' },
+  @{ Name='[B42]Pallontras Crossbows'; WorkshopId='3400528439'; Cat='Weapons' },
+  @{ Name='[B42]Firearm Models: Redux'; WorkshopId='3401576145'; Cat='Weapons' },
+  @{ Name='[B42] Vanilla Firearms Expansion [CLASSIC]'; WorkshopId='3761077099'; Cat='Weapons' },
+  # --- NPCs ---
+  @{ Name='[B42] Week One NPC'; WorkshopId='3403180543'; Cat='NPCs' },
+  @{ Name='[B42] Bandits NPC'; WorkshopId='3268487204'; Cat='NPCs' },
+  @{ Name='[B42] Bandits Creator'; WorkshopId='3469292499'; Cat='NPCs' },
+  @{ Name='[B42] True Companions - Experimental'; WorkshopId='3751199292'; Cat='NPCs' },
+  # --- Movement ---
+  @{ Name='[B42.20+/MP] Bicycle!'; WorkshopId='3461415167'; Cat='Movement' },
+  @{ Name='[B42.20+ MP] Skateboard!'; WorkshopId='3456675747'; Cat='Movement' },
+  @{ Name='[B42] Drag Bodies Faster'; WorkshopId='3393821407'; Cat='Movement' },
+  @{ Name='[B42][B41] Collapsible Ladder'; WorkshopId='3438123707'; Cat='Movement' },
+  @{ Name='[B42] Kick Scooter!'; WorkshopId='3453879909'; Cat='Movement' },
+  # --- Inventory ---
+  @{ Name='[B42] Pack Mule'; WorkshopId='3540903327'; Cat='Inventory' },
+  @{ Name='[B42] Nested Containers'; WorkshopId='3410947298'; Cat='Inventory' },
+  @{ Name='[B42.20]Zero Weight Keys'; WorkshopId='3776502124'; Cat='Inventory' },
+  @{ Name='[B42 STABLE/SP/MP] Home Inventory'; WorkshopId='3496924086'; Cat='Inventory' },
+  # --- Medical ---
+  @{ Name='[B42.21] The Only Cure'; WorkshopId='3580276809'; Cat='Medical' },
+  # --- Crafting ---
+  @{ Name='[B42.2*] Make Dried Fruit'; WorkshopId='3417502641'; Cat='Crafting' },
+  @{ Name='B42 - Process Scrap Metal'; WorkshopId='3392186364'; Cat='Crafting' },
+  # --- Quality of Life Mods ---
+  @{ Name='B42)SpiffoMoodles'; WorkshopId='3415594509'; Cat='Quality of Life Mods' },
+  @{ Name='[B42] Mod Manager'; WorkshopId='3567084868'; Cat='Quality of Life Mods' },
+  @{ Name='[B42]Mod Folders'; WorkshopId='3779201168'; Cat='Quality of Life Mods' },
+  @{ Name='[B42] Moodle Descriptions Expanded'; WorkshopId='3389003300'; Cat='Quality of Life Mods' },
+  @{ Name='[B42.21] Better Flashlights'; WorkshopId='3420478458'; Cat='Quality of Life Mods' },
+  @{ Name='[B42.20] Detailed Descriptions for Occupations and Traits'; WorkshopId='3387957272'; Cat='Quality of Life Mods' },
+  @{ Name="[B42] I Don't Need A Lighter"; WorkshopId='2714198296'; Cat='Quality of Life Mods' },
+  @{ Name='[B42] OSRS Exp Drops'; WorkshopId='3391145494'; Cat='Quality of Life Mods' },
+  @{ Name='[B42] Bigger Character Avatar'; WorkshopId='3387640099'; Cat='Quality of Life Mods' },
+  @{ Name='[B42] OSRS XP Drops Retextured'; WorkshopId='3413529369'; Cat='Quality of Life Mods' },
+  @{ Name='[B42MP] Lantern Fix'; WorkshopId='3495594275'; Cat='Quality of Life Mods' },
+  @{ Name='[B42] Item Details'; WorkshopId='3477237184'; Cat='Quality of Life Mods' },
+  @{ Name='[B42.13+] SimpleStatus-Fixed'; WorkshopId='3399432867'; Cat='Quality of Life Mods' },
+  @{ Name='[B42] Survival HUD'; WorkshopId='3495906499'; Cat='Quality of Life Mods' },
+  @{ Name='[B42] Item Condition Fix'; WorkshopId='3394609418'; Cat='Quality of Life Mods' },
+  @{ Name='[B42] Extended Battery Life'; WorkshopId='3387462212'; Cat='Quality of Life Mods' },
+  @{ Name='[B42] More Item Information'; WorkshopId='3494474677'; Cat='Quality of Life Mods' },
+  @{ Name='[B42]Now you can loot it!'; WorkshopId='3519087048'; Cat='Quality of Life Mods' },
+  @{ Name='[B42.13]Reading+'; WorkshopId='3641697417'; Cat='Quality of Life Mods' },
+  @{ Name='[B42/41] Automatic Stove Shutoff'; WorkshopId='3526968739'; Cat='Quality of Life Mods' },
+  @{ Name='[b42.20/B41]Gas mask breathing sound'; WorkshopId='3365778067'; Cat='Quality of Life Mods' },
+  @{ Name='[B42MP] Simple Show XP'; WorkshopId='2891170430'; Cat='Quality of Life Mods' },
+  @{ Name='[B42] Dynamic Gear Rattling'; WorkshopId='3808152720'; Cat='Quality of Life Mods' },
+  @{ Name="Xen's Enhanced GUI"; WorkshopId='3819012597'; Cat='Quality of Life Mods' },
+  # --- Maps & Tiles ---
+  @{ Name='B42 Fix Generators Bunkers Skyscrapers'; WorkshopId='3402067343'; Cat='Maps & Tiles' },
+  # --- Clothing & Gear ---
+  @{ Name='[B42MP] Frockin Wiseguys!'; WorkshopId='3538760023'; Cat='Clothing & Gear' },
+  @{ Name='[B42MP] Frockin Stompers!'; WorkshopId='3736813592'; Cat='Clothing & Gear' },
+  @{ Name="(B42) Hardwood's Swat Pack"; WorkshopId='3687353319'; Cat='Clothing & Gear' },
+  @{ Name='[B42.21] VSGirlBody(Integrated)'; WorkshopId='3640496116'; Cat='Clothing & Gear' },
+  @{ Name='B42 Swatpack Redux (Outdated: Legacy)'; WorkshopId='3408350979'; Cat='Clothing & Gear' },
+  @{ Name='[B42MP] Frockin Shirts & Ties!'; WorkshopId='3453676250'; Cat='Clothing & Gear' },
+  @{ Name='[B42MP] Frockin Splendor! Vol.5'; WorkshopId='3635394848'; Cat='Clothing & Gear' },
+  @{ Name='[B42MP] Frockin Splendor! Vol.4'; WorkshopId='3475347500'; Cat='Clothing & Gear' },
+  @{ Name='[B42MP] Frockin Splendor! Vol.3'; WorkshopId='3431256608'; Cat='Clothing & Gear' },
+  @{ Name='[B42MP] Frockin Splendor! Vol.2'; WorkshopId='3411888105'; Cat='Clothing & Gear' },
+  @{ Name='[B42MP] Frockin Splendor! Vol.1'; WorkshopId='3307376332'; Cat='Clothing & Gear' },
+  @{ Name='[B42MP] Frockin Splendor! Vol.6'; WorkshopId='3798149669'; Cat='Clothing & Gear' },
+  # --- Content Mods ---
+  @{ Name='[B42] Chinese Translation (Simplified)'; WorkshopId='3556544454'; Cat='Content Mods' },
+  @{ Name='B42 Simplified Chinese Fix'; WorkshopId='3386522562'; Cat='Content Mods' },
+  @{ Name='B42ModTrans_CN_As1'; WorkshopId='3556540080'; Cat='Content Mods' },
+  @{ Name='[B42] Water Pipes'; WorkshopId='3546314080'; Cat='Content Mods' },
+  @{ Name='[B42] Survival'; WorkshopId='3402516345'; Cat='Content Mods' },
+  @{ Name='B42 Chinese Translation Completion'; WorkshopId='3386702953'; Cat='Content Mods' },
+  @{ Name='[B42] Functional Gutters'; WorkshopId='3439305933'; Cat='Content Mods' },
+  @{ Name='[B42.20] Medieval Z'; WorkshopId='3661164291'; Cat='Content Mods' },
+  @{ Name='[B42] Horticulture'; WorkshopId='3650168851'; Cat='Content Mods' },
+  @{ Name='[B42] Briefing'; WorkshopId='3565244378'; Cat='Content Mods' },
+  @{ Name='[B42] Computer [outdated]'; WorkshopId='3548006452'; Cat='Content Mods' },
+  @{ Name='B42 - Extra Fliers of Interest'; WorkshopId='3391711960'; Cat='Content Mods' },
+  @{ Name='[B42] Exercise With Corpses'; WorkshopId='3404074048'; Cat='Content Mods' },
+  @{ Name='[B42.12] LLTC'; WorkshopId='3405214593'; Cat='Content Mods' },
+  @{ Name='[B42] SecretZ Pandemic (Alpha)'; WorkshopId='3494374578'; Cat='Content Mods' },
+  @{ Name='[B42] Advanced trajectory'; WorkshopId='3388409893'; Cat='Content Mods' },
+  @{ Name=' [B42.20] FantasyWorkshop 4.0'; WorkshopId='3717576490'; Cat='Content Mods' },
+  @{ Name='[B42] Anomalies'; WorkshopId='3719538235'; Cat='Content Mods' },
+  @{ Name='[B42] Traduccion Espanol'; WorkshopId='3392460250'; Cat='Content Mods' },
+  @{ Name='[B42 Port] Take a Bath'; WorkshopId='3485349033'; Cat='Content Mods' },
+  # --- Graphics ---
+  @{ Name='Fancy Handwork B42.21 Fixed'; WorkshopId='3811832848'; Cat='Graphics' },
+  @{ Name='3d Blood VFX for Viewpoint (experimental)'; WorkshopId='3811472160'; Cat='Graphics' },
+  @{ Name='Surface Fix - Project Viewpoint'; WorkshopId='3814398576'; Cat='Graphics' },
+  @{ Name='Viewpoint - Visible Loot'; WorkshopId='3818189653'; Cat='Graphics' },
+  @{ Name="Project Viewpoint: KK's TREE in 3D (Animated & Seasonal)"; WorkshopId='3813172420'; Cat='Graphics' },
+  @{ Name='Project Viewpoint QOL'; WorkshopId='3811256204'; Cat='Graphics' },
+  @{ Name='Bandits Radio Expansion 42.21 MP ( Project Viewpoint+ )'; WorkshopId='3630494926'; Cat='Graphics' },
+  @{ Name='Viewpoint - Visceral'; WorkshopId='3820965001'; Cat='Graphics' },
+  @{ Name='Project Viewpoint: Recoil & ADS'; WorkshopId='3812612054'; Cat='Graphics' },
+  @{ Name='Viewpoint - 3D Fences'; WorkshopId='3814486926'; Cat='Graphics' },
+  @{ Name='Viewpoint Rolling Hills'; WorkshopId='3815630947'; Cat='Graphics' },
+  @{ Name='Project Viewpoint - Immersive Driving'; WorkshopId='3817413313'; Cat='Graphics' },
+  @{ Name='Door Fix - Project Viewpoint'; WorkshopId='3812151347'; Cat='Graphics' },
+  @{ Name='Project Viewpoint: True Weathers & Lighting'; WorkshopId='3813908957'; Cat='Graphics' },
+  @{ Name='Viewpoint: Living Props'; WorkshopId='3816442251'; Cat='Graphics' },
+  @{ Name="Project Viewpoint: KK's Shelves in 3D"; WorkshopId='3815931973'; Cat='Graphics' },
+  @{ Name='OldPoint - Rotating Overhead Camera [B42 / Viewpoint]'; WorkshopId='3815999052'; Cat='Graphics' },
+  @{ Name='Viewpoint True Ballistics'; WorkshopId='3812864848'; Cat='Graphics' },
+  @{ Name='Viewpoint - 3D RVs [B42.21] [WIP]'; WorkshopId='3820158673'; Cat='Graphics' },
+  @{ Name='Viewpoint - Roofs (WIP)'; WorkshopId='3817294484'; Cat='Graphics' },
+  @{ Name='Project Viewpoint - Isometric No More'; WorkshopId='3819166046'; Cat='Graphics' },
+  @{ Name='Project Viewpoint Minimap (PZ3D Minimap) [B42.21.0] [SP/MP]'; WorkshopId='3810179295'; Cat='Graphics' },
+  @{ Name='Viewpoint Foraging'; WorkshopId='3814994364'; Cat='Graphics' },
+  @{ Name='Barricade Fix - Project Viewpoint'; WorkshopId='3815033191'; Cat='Graphics' },
+  @{ Name='Viewpoint - Interface'; WorkshopId='3812616893'; Cat='Graphics' },
+  @{ Name='Viewpoint - Advanced Throwables'; WorkshopId='3813194971'; Cat='Graphics' },
+  @{ Name='Viewpoint Advanced Movement'; WorkshopId='3812702301'; Cat='Graphics' },
+  @{ Name='Viewpoint - Immersive Effects'; WorkshopId='3812984535'; Cat='Graphics' },
+  @{ Name='[B42.21] Peek a View'; WorkshopId='3710281407'; Cat='Graphics' },
+  # --- Cheats ---
+  @{ Name='Simple Zomboid Trainer (cheat menu)'; WorkshopId='3821035301'; Cat='Cheats' },
+  @{ Name='[B42]DebugMenu'; WorkshopId='3386556284'; Cat='Cheats' },
+  # --- Multiplayer Mods ---
+  @{ Name='Survivor League - Community Edition'; WorkshopId='3784151798'; Cat='Multiplayer Mods' },
+  @{ Name='[B42.21+ MP] - Push Vehicle'; WorkshopId='3780639614'; Cat='Multiplayer Mods' },
+  @{ Name='Project Cook [B42]'; WorkshopId='3490188370'; Cat='Multiplayer Mods' },
+  @{ Name='Minimap Style Options'; WorkshopId='3526517370'; Cat='Multiplayer Mods' },
+  @{ Name='Thump with Friends [B42]'; WorkshopId='3504753006'; Cat='Multiplayer Mods' },
+  @{ Name='Immersive Blackouts [B42MP]'; WorkshopId='3607686447'; Cat='Multiplayer Mods' },
+  @{ Name='Where Is My Safehouse [B42]'; WorkshopId='3171815531'; Cat='Multiplayer Mods' }
 )
 $script:DefaultBase = @($Mods)
 
@@ -664,7 +840,8 @@ function Get-AllPacks([switch]$AllLists) {
   return $out
 }
 
-$script:RetiredWorkshopIds = @('3784151798','3780639614','3490188370','3526517370','3504753006','3607686447','3171815531')
+# v473: un-retired - the 7 multiplayer mods are live Build 42 Workshop items again (verified 2026-10-24); they rejoined the catalog under Multiplayer Mods.
+$script:RetiredWorkshopIds = @()
 # Catalog mods NOT seeded into the shipped Default list (and not
 # added to it by the tracksCatalog sync). They stay in the full
 # catalog: anyone can add them to any list manually at any time -
@@ -832,6 +1009,27 @@ function Get-WorkshopModDetails([string]$id) {
   return @{ Name = ''; Category = 'Others'; Status = 'Unknown' }
 }
 
+function Get-CollectionChildIds([string]$id) {
+  # Workshop IDs of the items a collection lists, in collection order.
+  # A Workshop collection is a list, not a mod: it has no files of its
+  # own. Returns the child IDs when the item is a collection, and an
+  # empty array when it is a regular item or Steam cannot be reached
+  # (a regular item answers result 9 to GetCollectionDetails). Callers
+  # wrap the result in @() and test the count.
+  $id = [string]$id
+  if ($id -eq '') { return @() }
+  try {
+    $r = Invoke-WebRequest -Uri 'https://api.steampowered.com/ISteamRemoteStorage/GetCollectionDetails/v1/' -Method Post -Body ('collectioncount=1&publishedfileids[0]=' + $id) -ContentType 'application/x-www-form-urlencoded' -UseBasicParsing -TimeoutSec 5 -ErrorAction Stop
+    $d = $r.Content | ConvertFrom-Json
+    $det = @($d.response.collectiondetails)[0]
+    if ($det -and [int]$det.result -eq 1 -and $det.children) {
+      $ids = @($det.children | ForEach-Object { [string]$_.publishedfileid } | Where-Object { $_ -match '^\d+$' })
+      if ($ids.Count -gt 0) { return $ids }
+    }
+  } catch { }
+  return @()
+}
+
 function Get-WorkshopModName([string]$id) {
   # Title for a Workshop ID not in the catalog (cached; $null on failure).
   $id = [string]$id
@@ -847,9 +1045,16 @@ function Parse-ModIdsFromText([string]$text) {
   $out = @()
   $seen = @{}
   $tokens = @([string]$text -split '[,;\s]+' | Where-Object { $_ -ne '' })
+  # A work queue, not a fixed list: a pasted collection ID expands into
+  # the IDs of the mods it lists, appended here and processed in turn.
+  $queue = @()
   foreach ($tok in $tokens) {
-    $id = Get-WorkshopIdFromInput $tok
-    if (-not $id) { continue }
+    $tid = Get-WorkshopIdFromInput $tok
+    if ($tid) { $queue += [string]$tid }
+  }
+  $script:CollectionExpandNote = ''
+  for ($qi = 0; $qi -lt $queue.Count; $qi++) {
+    $id = [string]$queue[$qi]
     if ($seen.ContainsKey($id)) { continue }
     $seen[$id] = $true
     $nm = $id; $cat = 'Others'
@@ -868,7 +1073,18 @@ function Parse-ModIdsFromText([string]$text) {
     $valid = $true; $reject = ''
     if ($nm -eq $id) {
       $detail = Get-WorkshopModDetails $id
-      if ($detail.Status -eq 'Valid') { $nm = $detail.Name; $cat = $detail.Category }
+      if ($detail.Status -eq 'Valid') {
+        # A collection is a valid Workshop item but not a mod: queue
+        # the mods it lists instead of adding the collection itself
+        # (a collection row can never install - it has no files).
+        $childIds = @(Get-CollectionChildIds $id)
+        if ($childIds.Count -gt 0) {
+          foreach ($cid in $childIds) { if (-not $seen.ContainsKey([string]$cid)) { $queue += [string]$cid } }
+          $script:CollectionExpandNote = ('The Workshop item ' + $id + ' (' + [string]$detail.Name + ') is a collection, not a mod. Its ' + $childIds.Count + ' mods were added instead of the collection.')
+          continue
+        }
+        $nm = $detail.Name; $cat = $detail.Category
+      }
       elseif ($detail.Status -eq 'NotFound') { $valid = $false; $reject = 'not found on Workshop' }
       elseif ($detail.Status -eq 'WrongGame') { $valid = $false; $reject = 'not a Project Zomboid mod' }
     }
@@ -908,7 +1124,7 @@ $Packs = @(
   # Guns Pack is hand-picked: it excludes TIHFP Historical (may not work on B42).
   @{ Name='Guns Pack'; Desc='B42 gun packs: Totally East Bloc + American, Post Soviet Armory, US Grenades'; Ids=@('2961450523','3017885370','3722136144','3745718141') },
   # KI5 Fleet is hand-picked: when a KI5 car is added to $Mods, add its ID here too.
-  @{ Name='KI5 Vehicles Pack'; Desc='Every KI5 car in the pack (50+ vehicles, big download)'; Ids=@('3478633453','2900580391','2772575623','3005903549','3447272250','2478247379','3026723485','3258343790','2991201484','2937786633','2873290424','2913633066','3490370700','3213391371','3161951724','3346905070','3253385114','3320947974','3379334330','3409287192','2805630347','3418252689','3413704851','3418253716','3413706334','3428008364','2870394916','2566953935','3226885926','3196180339','3110911330','3052360250','3435796523','3034636011','2932549988','3292659291','3110913021','2952802178','2942793445','3366300557','3008795514','3504401781','2409333430','2642541073','2962175696','3287727378','2846036306','3152529790','2969343830','3073430075','3001592312','3088951320','2932547723') },
+  @{ Name='KI5 Vehicles Pack'; Desc='Every KI5 car in the pack (50+ vehicles, big download)'; Ids=@('3478633453','2900580391','2772575623','3005903549','3447272250','2478247379','3026723485','3258343790','2991201484','2937786633','2873290424','2913633066','3490370700','3213391371','3161951724','3346905070','3253385114','3320947974','3379334330','3409287192','2805630347','3418252689','3413704851','3418253716','3413706334','3428008364','2870394916','2566953935','3226885926','3196180339','3110911330','3052360250','3435796523','3034636011','2932549988','3292659291','3110913021','2952802178','2942793445','3366300557','3008795514','3504401781','2409333430','2642541073','2962175696','3287727378','2846036306','3152529790','2969343830','3073430075','3001592312','3088951320','2932547723','3631989559','3642935062','3596903773','3592777775','3614034284','3570973322','3647735736','3647736504','3652371248','3041122351','2971246021','2897390033','3315443103','3670063857','3670064951','3566868353','3539691958','3679880253','3684254299','2886833398','2886832936','2886832257','3703948448','3722240318','2799152995','3726526329','3730833846','2618213077','3743371090','3756938756','3766571591','3770890864','3779315249','3787530735','3171184800','2811383142','3799732653','3812024929','3820938264','2625625421','3171167894','3330403100') },
   @{ Name='Quality of Life Essentials Pack'; Desc='All quality-of-life mods (Common Sense, sorting, loot helpers, map tools...)'; Ids=@('CAT:Quality of Life Mods') },
   # NOTE: Mod Update and Alert System (3077900375) + Skill Recovery Journal (2503622437) + Conditional Speech (2398253681) + errorMagnifier (2896041179) removed 2026-10-13 - Alert System makes the in-game UI disappear on B42.21; Skill Recovery require=s it so it cannot load without it.
 # NOTE: Voiced Radio and TVs (2950750587) removed 2026-10-13 - requires VOICE_FRAMEWORK, no Workshop item exists for it (searched Steam API, author page, site-search), so it cannot run.
@@ -916,8 +1132,9 @@ $Packs = @(
   # Living Worlds Pack is Viewpoint only: A-Life lives in NPCs Pack (via CAT:NPCs) and ZombieBuddy is a Viewpoint dependency (DepMap) so it auto-installs — listing either here would overlap NPCs Pack.
   @{ Name='Living Worlds Pack'; Desc='Project Viewpoint (first-person; ZombieBuddy auto-installed as a dependency)'; Ids=@('3809306528') },
   @{ Name='Cheats Pack'; Desc='Cheat Menu: Rebuild'; Ids=@('CAT:Cheats') },
-  # Graphics Pack is hand-picked: models only - Viewpoint itself is in Living Worlds Pack.
-  @{ Name='Graphics Pack'; Desc='6244 3D models for Viewpoint (first-person)'; Ids=@('3810302175') },
+  # Graphics Pack follows the Graphics category: Viewpoint 3D models and addons, blood effects, shaders.
+  # Viewpoint itself stays out of this pack (the CAT rule skips mods a hand-picked pack already claims, and Living Worlds Pack claims it).
+  @{ Name='Graphics Pack'; Desc='All graphics mods (Viewpoint 3D models and addons, effects, shaders)'; Ids=@('CAT:Graphics') },
   @{ Name='NPCs Pack'; Desc='All NPC mods: A-Life NPCs, Knox Event Expanded NPC, Companion Dogs (+ ZombieBuddy)'; Ids=@('CAT:NPCs','3619862853') },
   @{ Name='Stories Pack'; Desc='Zomboid Storylines, Wolf Extraction Quest, Echoes of Knox'; Ids=@('CAT:Stories') },
   @{ Name='Events Pack'; Desc='Dynamic Events [B42.20], Chaos Mod'; Ids=@('CAT:Events') },
@@ -2352,6 +2569,11 @@ function Install-Mod([string]$WorkshopId, [string]$Name) {
   # An entry with no Workshop ID (bad user data) must not reach the
   # map save - Add-Member with an empty name throws and kills the GUI.
   if ($WorkshopId -notmatch '^\d+$') { return $false }
+  # A Workshop collection is a list of mods, not a mod: SteamCMD has no
+  # files to download for it, so stop here with the real reason instead
+  # of a wasted download and the generic no-mod.info failure.
+  $colChildren = @(Get-CollectionChildIds $WorkshopId)
+  if ($colChildren.Count -gt 0) { $script:InstallFailReason = 'Workshop collection, not a mod (it lists ' + $colChildren.Count + ' mods) - add the collection through Add Mods to bring in the mods it lists'; Write-Host ("  SKIPPED: " + $Name + " is a Workshop collection, not a mod - nothing to download.") -ForegroundColor Yellow; return $false }
   Ensure-SteamCmd
   New-Item -ItemType Directory -Force -Path $ModsDir | Out-Null
   $stray = Join-Path $ModsDir 'mods'
@@ -3769,6 +3991,17 @@ function Refresh-GuiCategories {
     $script:GuiPackFilterBox.SelectedIndex = 0
     $script:GuiPackFilter = 'All packs'
   }
+  if ($script:GuiModPackTargetBox) {
+    # The Add To Pack target list on the Mods tab: every pack. Like
+    # Move To Category, it starts empty when the app opens - no pack
+    # is targeted until one is picked. A pick survives refreshes for
+    # as long as that pack exists.
+    $prevTarget = [string]$script:GuiModPackTarget
+    $script:GuiModPackTargetBox.Items.Clear()
+    foreach ($pk in @(Get-AllPacks | Sort-Object Name)) { [void]$script:GuiModPackTargetBox.Items.Add([string]$pk.Name) }
+    if ($prevTarget -ne '' -and $script:GuiModPackTargetBox.Items.Contains($prevTarget)) { $script:GuiModPackTargetBox.SelectedItem = $prevTarget }
+    else { $script:GuiModPackTargetBox.SelectedIndex = -1; $script:GuiModPackTarget = '' }
+  }
 }
 
 function Get-AllCategoryNames {
@@ -3867,7 +4100,10 @@ function Refresh-GuiCategoriesTab {
     if ($act0 -ne '') { [void](Set-ModsFromNamedList $act0) }
     if (-not $script:GuiSelectedMods) { $script:GuiSelectedMods = @{} }
     if (-not $script:GuiSelectedCategories) { $script:GuiSelectedCategories = @{} }
-    if ($script:GuiModMoveCategoryBox) { $script:GuiModMoveCategoryBox.Items.Clear(); foreach ($cc in @(Get-AllCategoryNames)) { [void]$script:GuiModMoveCategoryBox.Items.Add($cc) } }
+    # The Move To Category dropdown on the Mods tab lists every
+    # category. Keep the current pick across this rebuild - a
+    # dropdown selection does not survive clearing the items.
+    if ($script:GuiModMoveCategoryBox) { $prevMoveCat = [string]$script:GuiModMoveCategoryBox.SelectedItem; $script:GuiModMoveCategoryBox.Items.Clear(); foreach ($cc in @(Get-AllCategoryNames)) { [void]$script:GuiModMoveCategoryBox.Items.Add($cc) }; if ($prevMoveCat -ne '' -and $script:GuiModMoveCategoryBox.Items.Contains($prevMoveCat)) { $script:GuiModMoveCategoryBox.SelectedItem = $prevMoveCat } }
     $installed = @(Get-InstalledWorkshopIds)
     $allNames = @(Get-AllCategoryNames)
     $script:GuiCategoriesTotal = $allNames.Count
@@ -4078,6 +4314,50 @@ function Move-GuiSelectedMods {
   Set-GuiTransientStatus (("Moved " + $n + " selected mod(s) to '" + $cat + "'."))
 }
 
+function Add-GuiSelectedModsToPack {
+  # Bulk-add every checked mod to the pack chosen in the Mods tab
+  # Add To Pack box. With no pack picked there, the pack selected in
+  # the Filter By pack list is the target instead. Pack membership
+  # is edited here; the Packs tab only creates, renames and deletes
+  # packs. The selection is kept, so the same mods can be added to
+  # another pack right away.
+  if (-not $script:GuiSelectedMods -or $script:GuiSelectedMods.Count -eq 0) { Set-GuiTransientStatus ('Select some mods first.'); return }
+  $packName = [string]$script:GuiModPackTarget
+  if ($packName -eq '' -and $script:GuiModPackTargetBox) { $packName = [string]$script:GuiModPackTargetBox.SelectedItem }
+  if ($packName -eq '' -and [string]$script:GuiPackFilter -ne '' -and [string]$script:GuiPackFilter -ne 'All packs') { $packName = [string]$script:GuiPackFilter }
+  if ($packName -eq '') { Set-GuiTransientStatus ('Pick a pack to add the selected mods to.'); return }
+  $entries = @()
+  foreach ($id in @($script:GuiSelectedMods.Keys)) {
+    $m = @($Mods | Where-Object { [string]$_.WorkshopId -eq [string]$id })[0]
+    if (-not $m) { continue }
+    $entries += [PSCustomObject]@{ WorkshopId = [string]$m.WorkshopId; Name = [string]$m.Name; Cat = [string]$m.Cat }
+  }
+  if ($entries.Count -eq 0) { Set-GuiTransientStatus ('Select some mods first.'); return }
+  Add-GuiPackMembers $packName $entries
+}
+
+function Remove-GuiSelectedModsFromPack {
+  # Bulk-remove every checked mod from the pack chosen in the Mods
+  # tab Add To Pack box (the same target box as Add To Pack). With
+  # no pack picked there, the pack selected in the Filter By pack
+  # list is the target instead. The mods stay in the list; only the
+  # pack membership changes. The selection is kept, so the same mods
+  # can be removed from another pack right away.
+  if (-not $script:GuiSelectedMods -or $script:GuiSelectedMods.Count -eq 0) { Set-GuiTransientStatus ('Select some mods first.'); return }
+  $packName = [string]$script:GuiModPackTarget
+  if ($packName -eq '' -and $script:GuiModPackTargetBox) { $packName = [string]$script:GuiModPackTargetBox.SelectedItem }
+  if ($packName -eq '' -and [string]$script:GuiPackFilter -ne '' -and [string]$script:GuiPackFilter -ne 'All packs') { $packName = [string]$script:GuiPackFilter }
+  if ($packName -eq '') { Set-GuiTransientStatus ('Pick a pack to remove the selected mods from.'); return }
+  $entries = @()
+  foreach ($id in @($script:GuiSelectedMods.Keys)) {
+    $m = @($Mods | Where-Object { [string]$_.WorkshopId -eq [string]$id })[0]
+    if (-not $m) { continue }
+    $entries += [PSCustomObject]@{ WorkshopId = [string]$m.WorkshopId; Name = [string]$m.Name; Cat = [string]$m.Cat }
+  }
+  if ($entries.Count -eq 0) { Set-GuiTransientStatus ('Select some mods first.'); return }
+  Remove-GuiPackMembers $packName $entries
+}
+
 
 function Get-ErrorReason($err) {
   # 'Error: <message> [function, file: line N]' - the stack top
@@ -4282,7 +4562,6 @@ function Update-GuiWorkshopButtons {
   # button for the main page, so View never duplicates it.
   $sel = $null; if ($script:GuiModList) { $sel = $script:GuiModList.SelectedItem }
   if ($script:GuiWorkshopButton) { $script:GuiWorkshopButton.IsEnabled = ($null -ne $sel -and [string]$sel.WorkshopId -match '^\d+$' -and [string]$sel.Name -ne '' -and [string]$sel.Name -ne [string]$sel.WorkshopId) }
-  $sel = $null; if ($script:GuiPackMemberList) { $sel = $script:GuiPackMemberList.SelectedItem }
 }
 
 function Update-GuiSelectionButtons {
@@ -4305,6 +4584,8 @@ function Update-GuiSelectionButtons {
   if ($script:GuiModRemoveFromListButton) { $script:GuiModRemoveFromListButton.IsEnabled = ($n -gt 0) }
 
   if ($script:GuiModMoveToCategoryButton) { $script:GuiModMoveToCategoryButton.IsEnabled = ($n -gt 0) }
+  if ($script:GuiModAddToPackButton) { $script:GuiModAddToPackButton.IsEnabled = ($n -gt 0) }
+  if ($script:GuiModRemoveFromPackButton) { $script:GuiModRemoveFromPackButton.IsEnabled = ($n -gt 0) }
   Sync-GuiHeaderCheckbox $script:GuiModList 'SelectAll' $script:GuiModsShownIds $script:GuiSelectedMods
 }
 
@@ -4320,29 +4601,6 @@ function Toggle-GuiSelectAllPacks {
   $script:GuiPackSelectionDirty = $true
   Refresh-GuiPacks
 }
-function Sort-GuiPackMemberRows($rows) {
-  $list = @($rows)
-  if ($list.Count -le 1) { return ,$list }
-  $col = $script:GuiPackMembersSortColumn; $desc = $script:GuiPackMembersSortDescending
-  if ($col -eq 'Name') { if ($desc) { return @($list | Sort-Object Name -Descending) } else { return @($list | Sort-Object Name) } }
-  if ($col -eq 'Category') { if ($desc) { return @($list | Sort-Object Category, Name -Descending) } else { return @($list | Sort-Object Category, Name) } }
-  if ($col -eq 'Status') { if ($desc) { return @($list | Sort-Object Status, Name -Descending) } else { return @($list | Sort-Object Status, Name) } }
-  if ($col -eq 'Date') { if ($desc) { return @($list | Sort-Object { [string]$_.InstalledDate }, Name -Descending) } else { return @($list | Sort-Object { [string]$_.InstalledDate }, Name) } }
-  if ($col -eq 'Size') { if ($desc) { return @($list | Sort-Object { [long]$_.SizeBytes }, Name -Descending) } else { return @($list | Sort-Object { [long]$_.SizeBytes }, Name) } }
-  if ($col -eq 'WorkshopId') { if ($desc) { return @($list | Sort-Object { [long]$_.WorkshopId }, Name -Descending) } else { return @($list | Sort-Object { [long]$_.WorkshopId }, Name) } }
-  return ,$list
-}
-function Cycle-GuiPackMembersSort([string]$col) {
-  if ($script:GuiPackMembersSortColumn -eq $col) {
-    $script:GuiPackMembersSortDescending = -not $script:GuiPackMembersSortDescending
-  } else { $script:GuiPackMembersSortColumn = $col; $script:GuiPackMembersSortDescending = $false }
-  # Re-render the current detail pack with the new sort (keeps the pack).
-  $dn = [string]$script:GuiPackDetailName
-  $dp = $null
-  if ($dn -ne '') { $dp = @(Get-AllPacks | Where-Object { $_.Name -eq $dn })[0] }
-  Refresh-GuiPackDetail $dp
-}
-
 function Toggle-GuiSelectAllLists {
   # Header checkbox on the Lists table: select all shown named lists or clear.
   if (-not $script:GuiSelectedLists) { $script:GuiSelectedLists = @{} }
@@ -4366,22 +4624,6 @@ function Toggle-GuiSelectAllCategories {
   if ($allSelected) { $script:GuiSelectedCategories = @{} } else { foreach ($name in @($script:GuiCategoriesShownNames.Keys)) { $script:GuiSelectedCategories[$name] = $true } }
   Refresh-GuiCategoriesTab
 }
-function Toggle-GuiSelectAllPackMembers {
-  # Header checkbox on the Packs detail table: select all members of the
-  # detail pack or clear (shared mod selection with the Mods tab).
-  $detailName = [string]$script:GuiPackDetailName
-  if ($detailName -eq '') { return }
-  $pack = @(Get-AllPacks | Where-Object { $_.Name -eq $detailName })[0]
-  if (-not $pack) { return }
-  $members = @(Get-PackModsFull $pack)
-  if (-not $script:GuiSelectedMods) { $script:GuiSelectedMods = @{} }
-  $allSelected = ($members.Count -gt 0)
-  foreach ($m in $members) { if (-not $script:GuiSelectedMods.ContainsKey([string]$m.WorkshopId)) { $allSelected = $false; break } }
-  if ($allSelected) { foreach ($m in $members) { $script:GuiSelectedMods.Remove([string]$m.WorkshopId) } } else { foreach ($m in $members) { $script:GuiSelectedMods[[string]$m.WorkshopId] = $m.Name } }
-  $script:GuiSelectionDirty = $true
-  Refresh-GuiPacks
-}
-
 function Toggle-GuiSelectAllMods {
   # Select-all toggles: if every shown mod is selected, clear the whole
   # selection; otherwise select every shown mod (current filter).
@@ -4717,8 +4959,6 @@ function Show-Console {
   } catch { }
 }
 
-$script:GuiPackDetailName = ''
-
 function Get-PackMods($pack, $catalog, [switch]$IncludeUnknown) {
   if (-not $catalog) { $catalog = $Mods }
   $ids = Expand-PackIds $pack $catalog
@@ -4761,8 +5001,7 @@ function New-GuiCustomPack {
   $customPacks += @{ Name = $nm; Desc = $desc; Ids = @(); List = (Get-ActiveListSafe); Created = (Get-Date -Format 'yyyy-MM-dd') }
   Save-CustomPacks $customPacks
   Remove-RemovedPackName (Get-ActiveListSafe) $nm
-  $script:GuiPackDetailName = $nm
-  Set-GuiTransientStatus ("Created pack '" + $nm + "'. Add members below.")
+  Set-GuiTransientStatus ("Created pack '" + $nm + "'. Add mods from the Mods tab with Add To Pack.")
   # Standard: refresh every view after this change (one composite call).
   Refresh-GuiAfterListChange
 }
@@ -4844,7 +5083,6 @@ function Rename-GuiCustomPack([string]$oldName) {
     $script:GuiSelectedPacks.Remove($oldName)
     $script:GuiSelectedPacks[$newName] = $true
   }
-  if ($script:GuiPackDetailName -eq $oldName) { $script:GuiPackDetailName = $newName }
   Set-GuiTransientStatus ("Renamed pack to '" + $newName + "'.")
   # Standard: refresh every view after this change (one composite call).
   Refresh-GuiAfterListChange
@@ -4883,6 +5121,32 @@ function Add-GuiPackMembers([string]$packName, $entries) {
   Refresh-GuiAfterListChange
 }
 
+function Remove-GuiPackMembers([string]$packName, $entries) {
+  # Removes one or more mods from a pack in a single save. For a
+  # built-in pack this creates the custom override (same name,
+  # Source = built-in) holding the remaining members, so the removal
+  # lands on the existing pack, not a copy. The mods stay in the list.
+  $customPacks = @(Get-CustomPacks)
+  $activeList = Get-ActiveListSafe
+  $target = @($customPacks | Where-Object { $_.Name -eq $packName -and [string]$_.List -eq $activeList })[0]
+  if (-not $target) {
+    $builtin = @(Get-AllPacks | Where-Object { $_.Name -eq $packName -and -not $_.Custom })[0]
+    if (-not $builtin) { return }
+    $ids = @(@(Get-PackModsFull $builtin) | ForEach-Object { [string]$_.WorkshopId })
+    $target = @{ Name = [string]$builtin.Name; Desc = $builtin.Desc; Ids = $ids; Source = [string]$builtin.Name; List = $activeList }
+    $customPacks += $target
+  }
+  $drop = @{}
+  foreach ($e in $entries) { $drop[[string]$e.WorkshopId] = $true }
+  $before = @($target.Ids).Count
+  $target.Ids = @($target.Ids | Where-Object { -not $drop.ContainsKey([string]$_) })
+  $removed = $before - @($target.Ids).Count
+  if ($removed -eq 0) { Set-GuiTransientStatus ('Selected mods are not in that pack.'); return }
+  Save-CustomPacks $customPacks
+  Set-GuiTransientStatus (("Removed " + $removed + " mod(s) from pack."))
+  Refresh-GuiAfterListChange
+}
+
 function Update-GuiPackSelectionButtons {
   # Refresh the Packs header bulk buttons: Install/Uninstall/Hide selected
   # show the selection count and disable at 0; Select-all toggles to
@@ -4894,18 +5158,6 @@ function Update-GuiPackSelectionButtons {
     # menu itself gates Rename / Edit Description / Delete by count.
     $script:GuiPackRenameDeleteButton.IsEnabled = ($n -gt 0)
   }
-  # Member (mod) sub-selection: checked pack members feed the shared
-  # mod selection; these buttons act on them in place.
-  $nm = 0
-  if ($script:GuiSelectedMods) { $nm = $script:GuiSelectedMods.Count }
-  # Standard: selection-requiring buttons disabled until the
-  # requirement is met. Detail-pack buttons need a pack in detail
-  # (GuiPackDetailName); member buttons need checked members.
-  $hasDetail = ([string]$script:GuiPackDetailName -ne '')
-  if ($script:GuiPackMemberAddButton) { $script:GuiPackMemberAddButton.IsEnabled = $hasDetail }
-  if ($script:GuiPackMemberAddFromListButton) { $script:GuiPackMemberAddFromListButton.IsEnabled = $hasDetail }
-  if ($script:GuiPackResetButton) { $script:GuiPackResetButton.IsEnabled = $hasDetail }
-  if ($script:GuiPackMemberRemoveButton) { $script:GuiPackMemberRemoveButton.IsEnabled = ($nm -gt 0) }
   Sync-GuiHeaderCheckbox $script:GuiPackList 'SelectAllPacks' $script:GuiPacksShownIds $script:GuiSelectedPacks
 }
 
@@ -4919,9 +5171,9 @@ function Cycle-GuiPacksSort([string]$col) {
 }
 function Refresh-GuiPacks {
   # Packs tab is a ListView + GridView (same table layout as the Mods tab):
-  # one row per pack, sortable headers, resizable columns. The selected
-  # pack's members show in the detail table below (Add / Remove / Rename /
-  # Delete / Reset there), replacing the old +/- expander rows.
+  # one row per pack, sortable headers, resizable columns. The tab only
+  # manages packs (create, rename, delete); membership is edited on the
+  # Mods tab with Add To Pack.
   # Shows the ACTIVE list's packs (Get-AllPacks is scoped to it).
   if (-not $script:GuiPackList) { return }
   if ($script:GuiRefreshingPacks) { return }
@@ -4987,14 +5239,6 @@ function Refresh-GuiPacks {
       elseif ($col -eq 'Installed') { $gvCols[2].Header = if ($script:GuiPacksSortDescending) { 'Installed (9-0)' } else { 'Installed (0-9)' } }
       elseif ($col -eq 'Description') { $gvCols[3].Header = if ($script:GuiPacksSortDescending) { 'Description (Z-A)' } else { 'Description (A-Z)' } }
     }
-    # Detail pane: members of the detail pack (first shown pack by default,
-    # or the pack the user clicked). The detail pack survives refreshes.
-    $detailName = [string]$script:GuiPackDetailName
-    $detailPack = $null
-    if ($detailName -ne '') { $detailPack = @($shownPacks | Where-Object { $_.Name -eq $detailName })[0] }
-    if (-not $detailPack -and $shownPacks.Count -gt 0) { $detailPack = $shownPacks[0]; $script:GuiPackDetailName = [string]$detailPack.Name }
-    if (-not $detailPack) { $script:GuiPackDetailName = '' }
-    Refresh-GuiPackDetail $detailPack
     $script:GuiPacksShown = $shownPacks.Count
     $script:GuiPacksTotal = @(Get-AllPacks).Count
     $packsTotalMods = 0
@@ -5009,74 +5253,6 @@ function Refresh-GuiPacks {
   Sync-GuiHeaderCheckbox $script:GuiPackList 'SelectAllPacks' $script:GuiPacksShownIds $script:GuiSelectedPacks
 }
 
-function Refresh-GuiPackDetail($pack) {
-  # Detail table under the Packs list: the detail pack's members + the
-  # Add / Remove / Rename / Delete / Reset controls for that pack.
-  if (-not $script:GuiPackMemberList) { return }
-  if (-not $pack) {
-    $script:GuiPackMemberList.ItemsSource = @()
-    if ($script:GuiPackMemberLabel) { $script:GuiPackMemberLabel.Text = 'Mods' }
-    if ($script:GuiPackResetButton) { $script:GuiPackResetButton.Visibility = [System.Windows.Visibility]::Collapsed }
-    return
-  }
-  $installed = @(Get-InstalledWorkshopIds)
-  $installMap = Get-InstallMap
-  $members = @(Get-PackModsFull $pack)
-  $items = @()
-  foreach ($m in $members) {
-    $isInstalled = $installed -contains [string]$m.WorkshopId
-    $pwid = [string]$m.WorkshopId
-    # Installed date (blank when not installed - same rule as Mods tab).
-    $pdate = ''
-    $psize = [long]0
-    if ($isInstalled -and $installMap -and $installMap.PSObject.Properties[$pwid]) {
-      $pe = $installMap.PSObject.Properties[$pwid].Value
-      $dv = $pe.installed_on
-      if ($dv) { $pdate = [string]$dv }
-      if ($pe.PSObject.Properties['size'] -and $pe.size) { $psize = [long]$pe.size } else { $psize = Get-ModDiskSize @($pe.folders) }
-    }
-    $items += [PSCustomObject]@{
-      Name = [string]$m.Name
-      Category = [string]$m.Cat
-      Status = if ($isInstalled) { 'Installed' } else { 'Not installed' }
-      InstalledDate = $pdate
-      Size = (Format-ModSize $psize)
-      SizeBytes = [long]$psize
-      WorkshopId = $pwid
-      IsChecked = $script:GuiSelectedMods.ContainsKey($pwid)
-    }
-  }
-  $items = Sort-GuiPackMemberRows $items
-  $script:GuiPackMemberList.ItemsSource = $items
-  # Header sort indicators.
-  if ($script:GuiPackMemberList.View -and $script:GuiPackMemberList.View.Columns) {
-    $mpvCols = $script:GuiPackMemberList.View.Columns
-    $mpl = @('Name', 'Category', 'Status', 'Installed Date', 'Size', 'Workshop ID')
-    for ($i = 0; $i -lt 6 -and ($i + 1) -lt $mpvCols.Count; $i++) { $mpvCols[$i + 1].Header = $mpl[$i] }
-    $mc = $script:GuiPackMembersSortColumn; $md = $script:GuiPackMembersSortDescending
-    if ($mc -eq 'Name') { $mpvCols[1].Header = if ($md) { 'Name (Z-A)' } else { 'Name (A-Z)' } }
-    elseif ($mc -eq 'Category') { $mpvCols[2].Header = if ($md) { 'Category (Z-A)' } else { 'Category (A-Z)' } }
-    elseif ($mc -eq 'Status') { $mpvCols[3].Header = if ($md) { 'Status (Not installed first)' } else { 'Status (Installed first)' } }
-    elseif ($mc -eq 'Date') { $mpvCols[4].Header = if ($md) { 'Installed Date (newest)' } else { 'Installed Date (oldest)' } }
-    elseif ($mc -eq 'Size') { $mpvCols[5].Header = if ($md) { 'Size (9-0)' } else { 'Size (0-9)' } }
-    elseif ($mc -eq 'WorkshopId') { $mpvCols[6].Header = if ($md) { 'Workshop ID (9-0)' } else { 'Workshop ID (0-9)' } }
-  }
-  # Detail header select-all checkbox.
-  if ($script:GuiPackMemberList.View -and $script:GuiPackMemberList.View.Columns -and $script:GuiPackMemberList.View.Columns.Count -gt 0) {
-    $hdrCb = $script:GuiPackMemberList.View.Columns[0].Header
-    if ($hdrCb -is [System.Windows.Controls.CheckBox]) {
-      $selCount = 0
-      foreach ($it in $items) { if ($it.IsChecked) { $selCount++ } }
-      if ($items.Count -eq 0 -or $selCount -eq 0) { $hdrCb.IsChecked = $false }
-      elseif ($selCount -eq $items.Count) { $hdrCb.IsChecked = $true }
-      else { $hdrCb.IsChecked = $false }
-    }
-  }
-  if ($script:GuiPackMemberLabel) { $script:GuiPackMemberLabel.Text = ('Mods in ' + [string]$pack.Name + ' (' + $members.Count + ')') }
-  # Rename / Delete only for custom packs; Reset only for copies with a Source.
-  $isCustom = [bool]$pack.Custom
-  if ($script:GuiPackResetButton) { $script:GuiPackResetButton.Visibility = if ($isCustom -and [string]$pack.Source -ne '') { [System.Windows.Visibility]::Visible } else { [System.Windows.Visibility]::Collapsed } }
-}
 function Delete-GuiSelectedPacks {
   # Delete every checked pack. Custom packs are removed; built-in
   # packs are tombstoned for the active list (they stay deleted in
@@ -5098,36 +5274,11 @@ function Delete-GuiSelectedPacks {
   $customPacks = @($customPacks | Where-Object { -not ($targets -contains [string]$_.Name -and [string]$_.List -eq $activeList) })
   Save-CustomPacks $customPacks
   foreach ($nm in $targets) { if ($builtinNames -contains $nm) { Add-RemovedPackName $activeList $nm } }
-  if ($targets -contains $script:GuiPackDetailName) { $script:GuiPackDetailName = '' }
   $script:GuiSelectedPacks = @{}
   Set-GuiTransientStatus (('Deleted ' + $targets.Count + ' selected pack(s).'))
   # Standard: refresh every view after this change (one composite call).
   Refresh-GuiAfterListChange
 }
-
-function Remove-GuiSelectedPackMembers {
-  # Remove every selected member of the detail pack from that pack.
-  $detailName = [string]$script:GuiPackDetailName
-  if ($detailName -eq '') { Set-GuiTransientStatus ('Select a pack first.'); return }
-  $pack = @(Get-AllPacks | Where-Object { $_.Name -eq $detailName })[0]
-  if (-not $pack -or -not $pack.Custom) { Set-GuiTransientStatus ('Mods can only be removed from a custom pack. Duplicate a built-in pack first to edit it.'); return }
-  $customPacks = @(Get-CustomPacks)
-  $activeList = Get-ActiveListSafe
-  $target = @($customPacks | Where-Object { $_.Name -eq $detailName -and [string]$_.List -eq $activeList })[0]
-  if (-not $target) { return }
-  $toRemove = @()
-  foreach ($id in @($script:GuiSelectedMods.Keys)) { if (@($target.Ids | Where-Object { [string]$_ -eq $id }).Count -gt 0) { $toRemove += $id } }
-  if ($toRemove.Count -eq 0) { Set-GuiTransientStatus ('Select at least one member of this pack to remove.'); return }
-  # Safeguard (standard): confirm before removing from the pack.
-  $res = Show-GuiMessageBox ('Remove ' + $toRemove.Count + ' selected mod(s) from pack ' + $detailName + '?') 'PZ Mod Manager' ([System.Windows.MessageBoxButton]::YesNo) ([System.Windows.MessageBoxImage]::Warning)
-  if ($res -ne [System.Windows.MessageBoxResult]::Yes) { return }
-  $target.Ids = @($target.Ids | Where-Object { $toRemove -notcontains [string]$_ })
-  Save-CustomPacks $customPacks
-  Set-GuiTransientStatus (('Removed ' + $toRemove.Count + ' mod(s) from pack.'))
-  # Standard: refresh every view after this change (one composite call).
-  Refresh-GuiAfterListChange
-}
-
 
 function Read-GuiInput([string]$prompt, [string]$title, [string]$defaultValue) {
   # Simple text-input dialog (WPF). Returns $null on Cancel or empty.
@@ -6209,7 +6360,6 @@ function Open-GuiWorkshopPage {
   $idx = -1
   if ($script:GuiTabControl) { $idx = $script:GuiTabControl.SelectedIndex }
   if ($idx -eq 0 -and $script:GuiModList) { $sel = $script:GuiModList.SelectedItem; if ($sel) { $wid = [string]$sel.WorkshopId; $nm = [string]$sel.Name } }
-  elseif ($idx -eq 1 -and $script:GuiPackMemberList) { $sel = $script:GuiPackMemberList.SelectedItem; if ($sel) { $wid = [string]$sel.WorkshopId; $nm = [string]$sel.Name } }
   # A row whose Name is just its Workshop ID is an unresolved entry
   # (a random ID, or added while offline) - there is no real mod
   # page for it. No fallback to the main page here: Browse Workshop
@@ -7184,7 +7334,6 @@ function Show-Gui {
         <MenuItem x:Name="MenuVariants" Header="Manage Variants"/>
         <MenuItem x:Name="MenuResetVariants" Header="Reset All Variant Choices"/>
         <MenuItem x:Name="MenuAddInstalled" Header="Add Existing Mods"/>
-        <MenuItem x:Name="MenuWorkshop" Header="View Mod's Page"/>
         <MenuItem x:Name="MenuBrowseWorkshop" Header="Workshop Home Page"/>
         <Separator/>
         <MenuItem x:Name="MenuClearCache" Header="Clear Cache"/>
@@ -7205,7 +7354,8 @@ function Show-Gui {
           <ScrollViewer Grid.Row="0" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled" Margin="0,0,0,4">
           <StackPanel Orientation="Horizontal">
             <TextBlock Text="Search:" VerticalAlignment="Center" Margin="0,0,6,0" Width="50"/>
-            <TextBox x:Name="SearchBox" Width="260" Margin="0,0,12,0"/>
+            <TextBox x:Name="SearchBox" Width="260" Margin="0,0,6,0"/>
+            <Button x:Name="ModSearchWorkshopButton" Content="Search Workshop" Padding="10,4" Margin="0,0,12,0"/>
             <TextBlock Text="Filter by:" VerticalAlignment="Center" Margin="0,0,6,0"/>
             <ComboBox x:Name="CategoryBox" Width="170" Margin="0,0,12,0"/>
             <ComboBox x:Name="PackFilterBox" Width="170" Margin="0,0,12,0"/>
@@ -7216,21 +7366,25 @@ function Show-Gui {
             <TextBlock Text="ID/URL:" VerticalAlignment="Center" Margin="0,0,6,0" Width="50"/>
             <TextBox x:Name="ModAddIdBox" Width="160" Margin="0,0,6,0" VerticalContentAlignment="Center"/>
             <Button x:Name="ModAddButton" Content="Add Mods" Padding="10,4" Margin="0,0,12,0"/>
-            <Button x:Name="ModSearchWorkshopButton" Content="Search Workshop" Padding="10,4" Margin="0,0,12,0"/>
             <Button x:Name="ModRemoveFromListButton" Content="Remove Selected From List" Padding="10,4"/>
           </StackPanel>
           </ScrollViewer>
           <ScrollViewer Grid.Row="2" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled" Margin="0,0,0,4">
           <StackPanel Orientation="Horizontal">
             <TextBlock Text="Move to:" VerticalAlignment="Center" Margin="0,0,6,0" Width="50"/>
-            <ComboBox x:Name="ModMoveCategoryBox" IsEditable="True" Width="200" Margin="0,0,6,0" VerticalContentAlignment="Center"/>
+            <ComboBox x:Name="ModMoveCategoryBox" Width="200" Margin="0,0,6,0" VerticalContentAlignment="Center"/>
             <Button x:Name="ModMoveToCategoryButton" Content="Move To Category" Padding="10,4" Margin="0,0,12,0"/>
+            <TextBlock Text="Add to pack:" VerticalAlignment="Center" Margin="12,0,6,0"/>
+            <ComboBox x:Name="ModPackTargetBox" Width="200" Margin="0,0,6,0"/>
+            <Button x:Name="ModAddToPackButton" Content="Add To Pack" Padding="10,4" Margin="0,0,12,0"/>
+            <Button x:Name="ModRemoveFromPackButton" Content="Remove From Pack" Padding="10,4"/>
           </StackPanel>
           </ScrollViewer>
           <ScrollViewer Grid.Row="3" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled" Margin="0,0,0,8">
           <StackPanel Orientation="Horizontal">
             <Button x:Name="InstallSelectedModsButton" Content="Install Selected" Padding="10,4" Margin="0,0,12,0"/>
             <Button x:Name="UninstallSelectedModsButton" Content="Uninstall Selected" Padding="10,4" Margin="0,0,12,0"/>
+            <Button x:Name="ViewModPageButton" Content="View Mod's Page" Padding="10,4" Margin="0,0,12,0"/>
           </StackPanel>
           </ScrollViewer>
           <ListView x:Name="ModList" ScrollViewer.HorizontalScrollBarVisibility="Disabled" Grid.Row="4">
@@ -7263,8 +7417,6 @@ function Show-Gui {
           <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
-            <RowDefinition Height="2*"/>
-            <RowDefinition Height="Auto"/>
             <RowDefinition Height="*"/>
           </Grid.RowDefinitions>
           <ScrollViewer Grid.Row="0" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled" Margin="0,0,0,4">
@@ -7277,6 +7429,7 @@ function Show-Gui {
           <StackPanel Orientation="Horizontal">
             <Button x:Name="NewPackButton" Content="New Pack" Padding="10,4" Margin="0,0,12,0"/>
             <Button x:Name="PackRenameDeleteButton" Content="Rename / Delete" Padding="10,4" Margin="0,0,12,0"/>
+            <TextBlock Text="Select mods in the Mods tab, then use Add To Pack there." VerticalAlignment="Center" Foreground="Gray"/>
           </StackPanel>
           </ScrollViewer>
           <ListView x:Name="PackList" ScrollViewer.HorizontalScrollBarVisibility="Disabled" Grid.Row="2">
@@ -7295,38 +7448,6 @@ function Show-Gui {
                 <GridViewColumn Header="Name" Width="280" DisplayMemberBinding="{Binding Name}"/>
                 <GridViewColumn Header="Installed" Width="110" DisplayMemberBinding="{Binding Installed}"/>
                 <GridViewColumn HeaderContainerStyle="{StaticResource NoGripperHeader}" Header="Description" Width="200" DisplayMemberBinding="{Binding Description}"/>
-              </GridView>
-            </ListView.View>
-          </ListView>
-          <ScrollViewer Grid.Row="3" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled" Margin="0,8,0,4">
-          <StackPanel Orientation="Horizontal">
-            <TextBlock x:Name="PackMemberLabel" Text="Mods" FontWeight="Bold" VerticalAlignment="Center" Margin="0,0,12,0"/>
-            <TextBox x:Name="PackMemberIdBox" Width="160" Margin="0,0,6,0" VerticalContentAlignment="Center"/>
-            <Button x:Name="PackMemberAddButton" Content="Add Mods" Padding="10,4" Margin="0,0,12,0"/>
-            <Button x:Name="PackMemberAddFromListButton" Content="Add From List" Padding="10,4" Margin="0,0,12,0"/>
-            <Button x:Name="PackMemberRemoveButton" Content="Remove Selected From Pack" Padding="10,4" Margin="0,0,12,0"/>
-                        <Button x:Name="PackResetButton" Content="Reset To Built-In Pack" Padding="10,4"/>
-          </StackPanel>
-          </ScrollViewer>
-          <ListView x:Name="PackMemberList" ScrollViewer.HorizontalScrollBarVisibility="Disabled" Grid.Row="4">
-            <ListView.View>
-              <GridView AllowsColumnReorder="False">
-                <GridViewColumn HeaderContainerStyle="{StaticResource NoGripperHeader}" Width="28">
-                  <GridViewColumn.Header>
-                    <CheckBox Tag="SelectAllPackMembers" ToolTip="Select all / clear selection" VerticalAlignment="Center" HorizontalAlignment="Center"/>
-                  </GridViewColumn.Header>
-                  <GridViewColumn.CellTemplate>
-                    <DataTemplate>
-                      <CheckBox IsChecked="{Binding IsChecked}" VerticalAlignment="Center" HorizontalAlignment="Center"/>
-                    </DataTemplate>
-                  </GridViewColumn.CellTemplate>
-                </GridViewColumn>
-                <GridViewColumn Header="Name" Width="400" DisplayMemberBinding="{Binding Name}"/>
-                <GridViewColumn Header="Category" Width="150" DisplayMemberBinding="{Binding Category}"/>
-                <GridViewColumn Header="Status" Width="150" DisplayMemberBinding="{Binding Status}"/>
-                <GridViewColumn Header="Installed Date" Width="180" DisplayMemberBinding="{Binding InstalledDate}"/>
-                <GridViewColumn Header="Size" Width="100" DisplayMemberBinding="{Binding Size}"/>
-                <GridViewColumn HeaderContainerStyle="{StaticResource NoGripperHeader}" Header="Workshop ID" Width="150" DisplayMemberBinding="{Binding WorkshopId}"/>
               </GridView>
             </ListView.View>
           </ListView>
@@ -7441,6 +7562,9 @@ function Show-Gui {
     $script:GuiInstallSelectedModsButton = $script:GuiWindow.FindName('InstallSelectedModsButton')
     $script:GuiModMoveCategoryBox = $script:GuiWindow.FindName('ModMoveCategoryBox')
     $script:GuiModMoveToCategoryButton = $script:GuiWindow.FindName('ModMoveToCategoryButton')
+    $script:GuiModPackTargetBox = $script:GuiWindow.FindName('ModPackTargetBox')
+    $script:GuiModAddToPackButton = $script:GuiWindow.FindName('ModAddToPackButton')
+    $script:GuiModRemoveFromPackButton = $script:GuiWindow.FindName('ModRemoveFromPackButton')
     $script:GuiUninstallSelectedModsButton = $script:GuiWindow.FindName('UninstallSelectedModsButton')
     $script:GuiListRenameDeleteButton = $script:GuiWindow.FindName('ListRenameDeleteButton')
     $script:GuiSetActiveListButton = $script:GuiWindow.FindName('SetActiveListButton')
@@ -7449,7 +7573,7 @@ function Show-Gui {
     $script:GuiCompatReportButton = $script:GuiWindow.FindName('MenuCompatReport')  # Tools menu item
     $script:GuiVariantsButton = $script:GuiWindow.FindName('MenuVariants')  # Tools menu item
     $script:GuiResetVariantsButton = $script:GuiWindow.FindName('MenuResetVariants')  # Tools menu item
-    $script:GuiWorkshopButton = $script:GuiWindow.FindName('MenuWorkshop')  # Tools menu item
+    $script:GuiWorkshopButton = $script:GuiWindow.FindName('ViewModPageButton')  # Mods tab install row button
     $script:GuiBrowseWorkshopButton = $script:GuiWindow.FindName('MenuBrowseWorkshop')  # Tools menu item
     $script:GuiModAddIdBox = $script:GuiWindow.FindName('ModAddIdBox')
     $script:GuiModAddButton = $script:GuiWindow.FindName('ModAddButton')
@@ -7458,14 +7582,7 @@ function Show-Gui {
     $script:GuiModRemoveFromListButton = $script:GuiWindow.FindName('ModRemoveFromListButton')
     $script:GuiModList = $script:GuiWindow.FindName('ModList')
     $script:GuiPackList = $script:GuiWindow.FindName('PackList')
-    $script:GuiPackMemberList = $script:GuiWindow.FindName('PackMemberList')
-    $script:GuiPackMemberLabel = $script:GuiWindow.FindName('PackMemberLabel')
-    $script:GuiPackMemberIdBox = $script:GuiWindow.FindName('PackMemberIdBox')
-    $script:GuiPackMemberAddButton = $script:GuiWindow.FindName('PackMemberAddButton')
-    $script:GuiPackMemberAddFromListButton = $script:GuiWindow.FindName('PackMemberAddFromListButton')
-    $script:GuiPackMemberRemoveButton = $script:GuiWindow.FindName('PackMemberRemoveButton')
     $script:GuiPackRenameDeleteButton = $script:GuiWindow.FindName('PackRenameDeleteButton')
-    $script:GuiPackResetButton = $script:GuiWindow.FindName('PackResetButton')
     $script:GuiNamedListView = $script:GuiWindow.FindName('NamedListView')
     $script:GuiAddCategoryButton = $script:GuiWindow.FindName('AddCategoryButton')
     $script:GuiCategoryListView = $script:GuiWindow.FindName('CategoryListView')
@@ -7479,7 +7596,6 @@ function Show-Gui {
     $script:GuiNewPackButton = $script:GuiWindow.FindName('NewPackButton')
     Register-LastColumnFill $script:GuiModList
     Register-LastColumnFill $script:GuiPackList
-    Register-LastColumnFill $script:GuiPackMemberList
     Register-LastColumnFill $script:GuiNamedListView
     Register-LastColumnFill $script:GuiCategoryListView
     $script:GuiTabControl = $script:GuiWindow.FindName('MainTabControl')
@@ -7514,6 +7630,9 @@ function Show-Gui {
       $script:GuiPackFilter = $script:GuiPackFilterBox.SelectedItem
       Clear-GuiSelection; Refresh-GuiMods
     })
+    $script:GuiModPackTargetBox.Add_SelectionChanged({
+      $script:GuiModPackTarget = [string]$script:GuiModPackTargetBox.SelectedItem
+    })
     $script:GuiUpdateAllButton.Add_Click({
       Set-GuiBusy $true
       try {
@@ -7531,7 +7650,7 @@ function Show-Gui {
     $script:GuiResetVariantsButton.Add_Click({ Reset-AllVariantChoices })
     $script:GuiWorkshopButton.Add_Click({ Open-GuiWorkshopPage })
     $script:GuiBrowseWorkshopButton.Add_Click({ Start-Process 'https://steamcommunity.com/app/108600/workshop/' })
-    $script:GuiModAddButton.Add_Click({ $typed = [string]$script:GuiModAddIdBox.Text; if ($typed.Trim() -ne '') { $entries = @(Parse-ModIdsFromText $typed); if ($entries.Count -gt 0) { $valid = @($entries | Where-Object { [bool]$_.Valid }); $rejected = @($entries | Where-Object { -not [bool]$_.Valid }); if ($valid.Count -gt 0) { Add-GuiListMembers (Get-ActiveListSafe) $valid }; if ($rejected.Count -gt 0) { Show-GuiRejectedWorkshopIds $rejected }; $script:GuiModAddIdBox.Text = '' } else { Set-GuiTransientStatus ('No valid Workshop ID found.') } } else { Set-GuiTransientStatus ('Enter an ID/URL.') } })
+    $script:GuiModAddButton.Add_Click({ $typed = [string]$script:GuiModAddIdBox.Text; if ($typed.Trim() -ne '') { $entries = @(Parse-ModIdsFromText $typed); if ($entries.Count -gt 0) { $valid = @($entries | Where-Object { [bool]$_.Valid }); $rejected = @($entries | Where-Object { -not [bool]$_.Valid }); if ($valid.Count -gt 0) { Add-GuiListMembers (Get-ActiveListSafe) $valid }; if ($rejected.Count -gt 0) { Show-GuiRejectedWorkshopIds $rejected }; if ($script:CollectionExpandNote -ne '') { [void](Show-GuiMessageBox $script:CollectionExpandNote 'Add mods' ([System.Windows.MessageBoxButton]::OK) ([System.Windows.MessageBoxImage]::Information)) }; $script:GuiModAddIdBox.Text = '' } else { Set-GuiTransientStatus ('No valid Workshop ID found.') } } else { Set-GuiTransientStatus ('Enter an ID/URL.') } })
     $script:GuiModSearchWorkshopButton.Add_Click({ $res = Show-GuiWorkshopSearch; if ($res.Failed) { Set-GuiTransientStatus ('Could not open Workshop search: ' + [string]$script:LastPickerError); return }; $picked = @($res.Selected); if ($picked.Count -eq 0) { Set-GuiTransientStatus ('Workshop search cancelled.'); return }; Add-GuiListMembers (Get-ActiveListSafe) $picked })
     $script:GuiModAddInstalledButton.Add_Click({ $safe2 = Get-ActiveListSafe; if ($safe2 -eq '') { Set-GuiTransientStatus ('No active list.'); return }; $res = Show-GuiAddInstalledPicker $safe2; if ($res.Failed) { Set-GuiTransientStatus ('Could not open the picker: ' + [string]$script:LastPickerError); return }; $picked = @($res.Selected); if ($picked.Count -eq 0) { if ($res.NoCandidates) { Set-GuiTransientStatus ('Nothing to add - all existing mods are already in this list.'); } else { Set-GuiTransientStatus ('Add existing mods cancelled.'); }; return }; $map2 = Get-InstallMap; $newMap2 = $false; foreach ($e2 in $picked) { if (-not $map2) { $map2 = New-Object PSObject }; if (-not $map2.PSObject.Properties[[string]$e2.WorkshopId]) { $me = New-Object PSObject; $me | Add-Member -NotePropertyName 'installed' -NotePropertyValue $true; $me | Add-Member -NotePropertyName 'folders' -NotePropertyValue @([string]$e2.TopFolder); $me | Add-Member -NotePropertyName 'stamp' -NotePropertyValue (Get-InstalledModStamp (Join-Path $ModsDir ([string]$e2.TopFolder))); $me | Add-Member -NotePropertyName 'installed_on' -NotePropertyValue (Get-Date -Format 'yyyy-MM-dd'); $map2 | Add-Member -NotePropertyName ([string]$e2.WorkshopId) -NotePropertyValue $me -Force; $newMap2 = $true } }; if ($newMap2) { Save-InstallMap $map2 }; Add-GuiListMembers $safe2 $picked })
     $script:GuiModRemoveFromListButton.Add_Click({ Remove-GuiSelectedModsFromList })
@@ -7604,51 +7723,6 @@ function Show-Gui {
         }
       }
     })
-    $script:GuiPackList.Add_SelectionChanged({
-      # A click refreshes the WHOLE Packs tab (top + detail together,
-      # from the same snapshot). A detail-only refresh could run
-      # against a stale pack set and disagree with the top table
-      # (empty detail while top shows members). The re-entrancy guard
-      # in Refresh-GuiPacks stops the ItemsSource reset from recursing.
-      $item = $script:GuiPackList.SelectedItem
-      if ($item -and [string]$item.Name -ne '') {
-        $script:GuiPackDetailName = [string]$item.Name
-        Refresh-GuiPacks
-      }
-    })
-    $script:GuiPackMemberList.AddHandler([System.Windows.Controls.Primitives.ButtonBase]::ClickEvent, [System.Windows.RoutedEventHandler]{
-      $src = $args[1].OriginalSource
-      if ($src -is [System.Windows.Controls.CheckBox]) {
-        if ([string]$src.Tag -eq 'SelectAllPackMembers') { Toggle-GuiSelectAllPackMembers }
-        else {
-          $item = $src.DataContext
-          if ($item -and [string]$item.WorkshopId -ne '') {
-            if (-not $script:GuiSelectedMods) { $script:GuiSelectedMods = @{} }
-            if ($src.IsChecked) { $script:GuiSelectedMods[[string]$item.WorkshopId] = [string]$item.Name } else { $script:GuiSelectedMods.Remove([string]$item.WorkshopId) }
-            $script:GuiSelectionDirty = $true
-            Update-GuiPackSelectionButtons
-          }
-        }
-      }
-    })
-    $script:GuiPackMemberList.AddHandler([System.Windows.Controls.GridViewColumnHeader]::ClickEvent, [System.Windows.RoutedEventHandler]{
-      $src = $args[1].OriginalSource
-      if ($src -is [System.Windows.Controls.GridViewColumnHeader]) {
-        $col = $src.Column
-        if ($col -and $script:GuiPackMemberList.View) {
-          $idx = $script:GuiPackMemberList.View.Columns.IndexOf($col)
-          $sortCol = $null
-          if ($idx -eq 1) { $sortCol = 'Name' }
-          elseif ($idx -eq 2) { $sortCol = 'Category' }
-          elseif ($idx -eq 3) { $sortCol = 'Status' }
-          elseif ($idx -eq 4) { $sortCol = 'Date' }
-          elseif ($idx -eq 5) { $sortCol = 'Size' }
-          elseif ($idx -eq 6) { $sortCol = 'WorkshopId' }
-          if ($sortCol) { Cycle-GuiPackMembersSort $sortCol }
-        }
-      }
-    })
-    $script:GuiPackMemberList.Add_SelectionChanged({ Update-GuiWorkshopButtons })
     $script:GuiNamedListView.AddHandler([System.Windows.Controls.GridViewColumnHeader]::ClickEvent, [System.Windows.RoutedEventHandler]{
       $src = $args[1].OriginalSource
       if ($src -is [System.Windows.Controls.GridViewColumnHeader]) {
@@ -7721,9 +7795,8 @@ function Show-Gui {
     $script:GuiInstallSelectedModsButton.Add_Click({ Install-GuiSelectedMods })
     $script:GuiUninstallSelectedModsButton.Add_Click({ Uninstall-GuiSelectedMods })
     $script:GuiModMoveToCategoryButton.Add_Click({ Move-GuiSelectedMods })
-    $script:GuiPackMemberAddButton.Add_Click({ $typed = [string]$script:GuiPackMemberIdBox.Text; if ($typed.Trim() -ne '') { $entries = @(Parse-ModIdsFromText $typed); if ($entries.Count -gt 0) { $valid = @($entries | Where-Object { [bool]$_.Valid }); $rejected = @($entries | Where-Object { -not [bool]$_.Valid }); if ($valid.Count -gt 0) { Add-GuiPackMembers $script:GuiPackDetailName $valid }; if ($rejected.Count -gt 0) { Show-GuiRejectedWorkshopIds $rejected }; $script:GuiPackMemberIdBox.Text = '' } else { Set-GuiTransientStatus ('No valid Workshop ID found.') } } else { Set-GuiTransientStatus ('Enter an ID/URL.') } })
-    $script:GuiPackMemberAddFromListButton.Add_Click({ $pk = $script:GuiPackDetailName; if ($pk -eq '') { Set-GuiTransientStatus ('Pick a pack first.'); return }; $res = Show-GuiAddFromListPicker $pk; if ($res.Failed) { Set-GuiTransientStatus ('Could not open the picker: ' + [string]$script:LastPickerError); return }; $picked = @($res.Selected); if ($picked.Count -eq 0) { if ($res.NoCandidates) { Set-GuiTransientStatus ('Nothing to add - all list mods are already in this pack.'); } else { Set-GuiTransientStatus ('Add from list cancelled.'); }; return }; Add-GuiPackMembers $pk $picked })
-    $script:GuiPackMemberRemoveButton.Add_Click({ Remove-GuiSelectedPackMembers })
+    $script:GuiModAddToPackButton.Add_Click({ Add-GuiSelectedModsToPack })
+    $script:GuiModRemoveFromPackButton.Add_Click({ Remove-GuiSelectedModsFromPack })
     $script:GuiPackRenameDeleteMenu = New-Object System.Windows.Controls.ContextMenu
     $script:GuiPackRenameDeleteRenameItem = New-Object System.Windows.Controls.MenuItem
     $script:GuiPackRenameDeleteRenameItem.Header = 'Rename Selected Pack...'
@@ -7756,7 +7829,6 @@ function Show-Gui {
     })
     $script:GuiPackRenameDeleteButton.ContextMenu = $script:GuiPackRenameDeleteMenu
     $script:GuiPackRenameDeleteButton.Add_Click({ $script:GuiPackRenameDeleteButton.ContextMenu.IsOpen = $true })
-    $script:GuiPackResetButton.Add_Click({ Reset-GuiCustomPack $script:GuiPackDetailName })
     $script:GuiCategoryRenameDeleteMenu = New-Object System.Windows.Controls.ContextMenu
     $script:GuiCategoryRenameItem = New-Object System.Windows.Controls.MenuItem
     $script:GuiCategoryRenameItem.Header = 'Rename Selected Category...'
