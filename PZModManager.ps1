@@ -1,11 +1,11 @@
-# PZ Mod Manager - Created by duy64. Licensed under the MIT License (see LICENSE.txt).
+﻿# PZ Mod Manager - Created by duy64. Licensed under the MIT License (see LICENSE.txt).
 #Requires -Version 5.1
 <#
-  PZ Mod Manager v473 - B42 Essentials: mod pack for Single-Player & Multiplayer
-  Full collection (~375 mods) + Cheat Menu: Rebuild, no Steam client needed.
+  PZ Mod Manager v478 - B42 Essentials: mod pack for Single-Player & Multiplayer
+  Full collection (~391 mods) + Cheat Menu: Rebuild, no Steam client needed.
 #>
 $ErrorActionPreference = 'Stop'
-$ScriptVersion = '2026-10-24'
+$ScriptVersion = '2026-10-27'
 
 $ModsDir     = Join-Path $env:USERPROFILE 'Zomboid\mods'
 $ToolsDir    = Join-Path $PSScriptRoot 'tools'
@@ -17,7 +17,7 @@ $NL          = [Environment]::NewLine
 # Target game build. B43 = change these lines; the layout repair and [10] checks derive from them.
 $GameBuild = '42'      # major build: version folder name (42/)
 $GameBuildFull = '42.21'  # current full build: versionMax floor for [10] warnings
-$ScriptVersion = '473'    # app version: shown in the menu header + GUI title
+$ScriptVersion = '478'    # app version: shown in the menu header + GUI title
 
 # All known categories, including ones with zero mods right now (Maps /
 # Audio / Zombies have no catalog mods yet). The category editor lists
@@ -96,7 +96,6 @@ $Mods = @(
   @{ Name='Yet Another PZ Library (YAPZLib)'; WorkshopId='3624971238'; Cat='Frameworks' },
   @{ Name='Moodle Framework (Dynamic Traits dependency)'; WorkshopId='3396446795'; Cat='Frameworks' },
   @{ Name='B42 Native ModOptions Example'; WorkshopId='3386860561'; Cat='Frameworks' },
-  @{ Name='[B42] ZombieBuddy Extensions'; WorkshopId='3807686870'; Cat='Frameworks' },
 
   # ---------- VEHICLES ----------
   @{ Name="'04 Volkswagen Touran"; WorkshopId='3478633453'; Cat='Vehicles' },
@@ -488,7 +487,28 @@ $Mods = @(
   @{ Name='Minimap Style Options'; WorkshopId='3526517370'; Cat='Multiplayer Mods' },
   @{ Name='Thump with Friends [B42]'; WorkshopId='3504753006'; Cat='Multiplayer Mods' },
   @{ Name='Immersive Blackouts [B42MP]'; WorkshopId='3607686447'; Cat='Multiplayer Mods' },
-  @{ Name='Where Is My Safehouse [B42]'; WorkshopId='3171815531'; Cat='Multiplayer Mods' }
+  @{ Name='Where Is My Safehouse [B42]'; WorkshopId='3171815531'; Cat='Multiplayer Mods' },
+
+  # ---------- ADDED IN v476: 17 aircraft join the catalog ----------
+  # --- Frameworks ---
+  @{ Name='[RKC]WINGSMITH Aircraft'; WorkshopId='3822736282'; Cat='Frameworks' },
+  @{ Name="MCK's Aviation | Beta"; WorkshopId='3818131749'; Cat='Frameworks' },
+  # --- Aircrafts ---
+  @{ Name="MCK's F-16 Fighting Falcon | Beta"; WorkshopId='3818132054'; Cat='Aircrafts' },
+  @{ Name="MCK's F-16 SOLOTURK Skin | Beta"; WorkshopId='3822455991'; Cat='Aircrafts' },
+  @{ Name="MCK's F-35A Lightning II | Beta"; WorkshopId='3822213041'; Cat='Aircrafts' },
+  @{ Name='[RKC]BOEING 737-200 / RV-HOPE'; WorkshopId='3824463369'; Cat='Aircrafts' },
+  @{ Name="MCK's F-22 Raptor | Beta"; WorkshopId='3826575785'; Cat='Aircrafts' },
+  @{ Name="MCK's F/A-18C Hornet | Beta"; WorkshopId='3826577364'; Cat='Aircrafts' },
+  @{ Name="MCK's Dassault Rafale C F3 | Beta"; WorkshopId='3826578205'; Cat='Aircrafts' },
+  @{ Name="MCK's Eurofighter Typhoon | Beta"; WorkshopId='3826574974'; Cat='Aircrafts' },
+  @{ Name="MCK's F-4F Phantom II | Beta"; WorkshopId='3826576541'; Cat='Aircrafts' },
+  @{ Name='[B42/ViewPoint] Skyhammer Air Support - Apache, A-10, AC-130 & B-2'; WorkshopId='3813483790'; Cat='Aircrafts' },
+  @{ Name="MCK's F-16CM (PoBIT) | Beta"; WorkshopId='3826575307'; Cat='Aircrafts' },
+  @{ Name="MCK's Sukhoi Su-57 | Beta"; WorkshopId='3826578915'; Cat='Aircrafts' },
+  @{ Name="MCK's Sukhoi Su-35 | Beta"; WorkshopId='3826578427'; Cat='Aircrafts' },
+  @{ Name="MCK's MiG-29 | Beta"; WorkshopId='3826577675'; Cat='Aircrafts' },
+  @{ Name='[RKC]LV-93 Business Jet (Based on Learjet 60) - Flyable Airplane'; WorkshopId='3822736890'; Cat='Aircrafts' }
 )
 $script:DefaultBase = @($Mods)
 
@@ -1119,7 +1139,7 @@ function Add-EntriesToActiveList($entries) {
 # category - so a new mod in a category auto-joins its pack (no pack edit needed).
 # Packs that stay ID-based are deliberately selective (see notes below).
 $Packs = @(
-  @{ Name='Aircrafts Pack'; Desc='Flyable UH-1B Huey helicopter + Aviation Core framework (both beta)'; Ids=@('3783444342','3409723807') },
+  @{ Name='Aircrafts Pack'; Desc='All aircraft: the UH-1B Huey helicopter, the MCK fighter jets, the RKC Boeing 737-200 and LV-93 Business Jet, and the Skyhammer air support call-ins, plus the Aviation Core framework'; Ids=@('CAT:Aircrafts','3783444342') },
   @{ Name='Tanks Pack'; Desc='M60A3, BTR-80, BMP-2, M113 APC, M1 Abrams + Military Tool Kit (driveable, working turrets)'; Ids=@('2705406713','3739363702','3661387277','3635550823','2705655822','3397147307') },
   # Guns Pack is hand-picked: it excludes TIHFP Historical (may not work on B42).
   @{ Name='Guns Pack'; Desc='B42 gun packs: Totally East Bloc + American, Post Soviet Armory, US Grenades'; Ids=@('2961450523','3017885370','3722136144','3745718141') },
@@ -3758,18 +3778,44 @@ function Find-GameFolder([bool]$AllowPrompt = $false) {
   return $null
 }
 
+function Write-GameLauncherScript([string]$GameFolder) {
+  # Writes the hidden launcher for the game shortcut and returns its path (or
+  # '' when it cannot be written). The .vbs runs ProjectZomboid64.bat through
+  # cmd.exe with window style 0, so no console window appears at all while
+  # the game runs. The .bat itself is needed because the .exe ignores
+  # _JAVA_OPTIONS, which is how the ZombieBuddy agent loads. The .vbs lives
+  # next to the .lnk (not in the manager folder) so it survives the manager
+  # moving to a new version folder.
+  $startMenu = Join-Path $env:APPDATA 'Microsoft\Windows\Start Menu\Programs'
+  if (-not (Test-Path $startMenu)) { return '' }
+  $bat = Join-Path $GameFolder 'ProjectZomboid64.bat'
+  if (-not (Test-Path $bat)) { return '' }
+  $vbs = Join-Path $startMenu 'Project Zomboid (ZombieBuddy).vbs'
+  $lines = @(
+    'Set sh = CreateObject("WScript.Shell")',
+    ('sh.CurrentDirectory = "{0}"' -f $GameFolder),
+    ('sh.Run "cmd /c ""{0}""", 0, False' -f $bat)
+  )
+  Set-Content -Path $vbs -Value $lines -Encoding ASCII
+  return $vbs
+}
+
 function Install-GameShortcut([string]$GameFolder) {
-  # Game launcher via .bat (so the ZombieBuddy agent loads - the .exe ignores _JAVA_OPTIONS).
-  # Target cmd.exe (not the .bat directly): Windows 11 hides 'Pin to Start' for shortcuts
-  # pointing at .bat files, but shows it for shortcuts pointing at an .exe. cmd /c still runs the .bat.
+  # Game launcher via a hidden .vbs (no console window at all while the game
+  # runs). The shortcut targets wscript.exe (an .exe), so Windows 11 still
+  # shows 'Pin to Start' for it. The .vbs runs the .bat hidden; the .bat is
+  # needed because the .exe ignores _JAVA_OPTIONS, which is how the
+  # ZombieBuddy agent loads.
   $startMenu = Join-Path $env:APPDATA 'Microsoft\Windows\Start Menu\Programs'
   if (-not (Test-Path $startMenu)) { return }
   if (-not $GameFolder -or -not (Test-Path (Join-Path $GameFolder 'ProjectZomboid64.bat'))) { return }
+  $vbs = Write-GameLauncherScript $GameFolder
+  if (-not $vbs) { return }
   $shell = New-Object -ComObject WScript.Shell
   $lnk = Join-Path $startMenu 'Project Zomboid (ZombieBuddy).lnk'
   $sc = $shell.CreateShortcut($lnk)
-  $sc.TargetPath = $env:ComSpec
-  $sc.Arguments = '/c "' + (Join-Path $GameFolder 'ProjectZomboid64.bat') + '"'
+  $sc.TargetPath = Join-Path $env:SystemRoot 'System32\wscript.exe'
+  $sc.Arguments = '"' + $vbs + '"'
   $sc.WorkingDirectory = $GameFolder
   $sc.Description = 'Project Zomboid with ZombieBuddy agent (for Viewpoint 3D)'
   $exe = Join-Path $GameFolder 'ProjectZomboid64.exe'
@@ -3843,6 +3889,45 @@ function Repair-ManagerShortcut {
   } catch { }
 }
 
+function Repair-GameShortcut {
+  # v475: the game shortcut now launches through a hidden .vbs (no console
+  # window at all), replacing the v474 minimized cmd.exe shortcut. Convert a
+  # v474 shortcut (cmd.exe running ProjectZomboid64.bat) on first run, and
+  # rewrite the .vbs if it was deleted. Only touch shortcuts the manager
+  # created. If the user deleted the shortcut, leave it deleted.
+  $startMenu = Join-Path $env:APPDATA 'Microsoft\Windows\Start Menu\Programs'
+  $lnk = Join-Path $startMenu 'Project Zomboid (ZombieBuddy).lnk'
+  if (-not (Test-Path $lnk)) { return }
+  $game = Find-GameFolder -AllowPrompt:$false
+  if (-not $game) { return }
+  $vbs = Join-Path $startMenu 'Project Zomboid (ZombieBuddy).vbs'
+  try {
+    $shell = New-Object -ComObject WScript.Shell
+    $sc = $shell.CreateShortcut($lnk)
+    $wscript = Join-Path $env:SystemRoot 'System32\wscript.exe'
+    if ($sc.TargetPath -eq $wscript -and $sc.Arguments -match 'ZombieBuddy\)\.vbs') {
+      if (-not (Test-Path $vbs)) {
+        if (Write-GameLauncherScript $game) {
+          Write-Host '  Start Menu game launcher rewritten.' -ForegroundColor DarkGray
+        }
+      }
+      return
+    }
+    if ($sc.TargetPath -ne $env:ComSpec) { return }
+    if ($sc.Arguments -notmatch 'ProjectZomboid64\.bat') { return }
+    $newVbs = Write-GameLauncherScript $game
+    if (-not $newVbs) { return }
+    $sc.TargetPath = $wscript
+    $sc.Arguments = '"' + $newVbs + '"'
+    $sc.WorkingDirectory = $game
+    $sc.Description = 'Project Zomboid with ZombieBuddy agent (for Viewpoint 3D)'
+    $exe = Join-Path $game 'ProjectZomboid64.exe'
+    if (Test-Path $exe) { $sc.IconLocation = $exe }
+    $sc.Save()
+    Write-Host '  Start Menu shortcut updated to launch hidden.' -ForegroundColor DarkGray
+  } catch { }
+}
+
 function Test-NeedsZombieBuddyAgent([string]$WorkshopId) {
   # True if this mod IS ZombieBuddy or depends on it (DepMap). Installing such a mod
   # must ensure the agent + shortcuts, even when ZombieBuddy itself was already installed
@@ -3867,6 +3952,8 @@ function Remove-ZombieBuddyAgent {
   $startMenu = Join-Path $env:APPDATA 'Microsoft\Windows\Start Menu\Programs'
   $lnk = Join-Path $startMenu 'Project Zomboid (ZombieBuddy).lnk'
   if (Test-Path $lnk) { Remove-Item $lnk -Force; Write-Host '  Removed Start Menu shortcut: Project Zomboid (ZombieBuddy)' -ForegroundColor DarkGray }
+  $vbs = Join-Path $startMenu 'Project Zomboid (ZombieBuddy).vbs'
+  if (Test-Path $vbs) { Remove-Item $vbs -Force; Write-Host '  Removed Start Menu game launcher: Project Zomboid (ZombieBuddy).vbs' -ForegroundColor DarkGray }
   $bat = Join-Path $game 'ProjectZomboid64.bat'
   $bak = $bat + '.bak'
   if (Test-Path $bat) {
@@ -7936,6 +8023,7 @@ $GameBuildMinor = $resolvedBuild.Minor
 Repair-GenericModFolders
 Repair-FlattenedMods
 Repair-ManagerShortcut
+Repair-GameShortcut
 
 # GUI-only since v234: the text menu was removed. Its features live in the
 # Mods tab (Clear cache) and the Lists tab.

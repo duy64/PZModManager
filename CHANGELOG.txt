@@ -1,6 +1,16 @@
 PZ MOD MANAGER - FULL CHANGELOG
 Created by duy64. Licensed under the MIT License (see LICENSE.txt).
 
+v478: Removed [B42] ZombieBuddy Extensions from the catalog and the Default list (391 mods in the catalog, 390 in the list). Without the manual ZombieBuddy.jar swap it does nothing - subscribing alone never activates it, and the manager does not perform the swap - so it was dead weight in the list. The Frameworks Pack shrinks by one automatically (it covers its whole category).
+
+v477: The Aircrafts Pack now covers the whole Aircrafts category (CAT:Aircrafts) plus the Aviation Core framework, so the fifteen new aircraft join the pack automatically - previously the pack listed only the UH-1B Huey helicopter and Aviation Core by ID, so the new aircraft appeared under the Aircrafts category but not in the pack. The Frameworks Pack already covers its category, so the two new flight frameworks were already in it. No catalog changes (392 mods).
+
+v476: Seventeen aircraft join the catalog (392 in total): the [RKC]WINGSMITH and MCK's Aviation flight frameworks plus fifteen aircraft - the MCK fighter jets, the RKC Boeing 737-200 and LV-93 Business Jet, and the Skyhammer air support call-ins. Aircrafts grows from 1 mod to 16, Frameworks from 16 to 18. The Default list file now holds 391 mods with every mod categorized; the four pack overrides are unchanged.
+
+v475: The Project Zomboid (ZombieBuddy) Start Menu shortcut now launches through a hidden launcher script, so no console window appears at all while the game runs. The manager also converts the existing shortcut when it starts, so the shortcut on the machine is updated the first time the new version opens. The game still writes its log to console.txt.
+
+v474: The Project Zomboid (ZombieBuddy) Start Menu shortcut now launches minimized, so the console window no longer sits on screen while the game runs. The manager also repairs the existing shortcut when it starts, so the shortcut on the machine is updated the first time the new version opens. The game still writes its log to console.txt.
+
 v473: The catalog now holds the full Default list: 161 mods added (375 in total), including the KI5 fleet, the Viewpoint 3D addons, the Frockin clothing line and the multiplayer mods. Five catalog mods moved to the category they belong in: Auto Reload and Simple Silencers to Weapons, Alice's Weapon Sling to Clothing and Gear, Improved Blood Effects and ShaderZ to Graphics. The Graphics Pack now follows the Graphics category instead of listing only the 3D models. The 7 multiplayer mods are no longer retired: they are live Build 42 Workshop items again, verified 2026-10-24. Six mod names with non-English characters are written out in plain text in the catalog so the script stays plain ASCII and loads the same on every machine; the Workshop pages still show the original titles.
 
 v472: Add To Pack and Remove From Pack now fall back to the pack selected in the Filter By pack list when no pack is picked in the Add To Pack list: filter to a pack, select mods, and the buttons act on the pack being viewed. A pack picked in the Add To Pack list still takes precedence.
