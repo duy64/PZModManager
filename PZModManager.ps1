@@ -1,7 +1,7 @@
 ﻿# PZ Mod Manager - Created by duy64. Licensed under the MIT License (see LICENSE.txt).
 #Requires -Version 5.1
 <#
-  PZ Mod Manager v479 - B42 Essentials: mod pack for Single-Player & Multiplayer
+  PZ Mod Manager v480 - B42 Essentials: mod pack for Single-Player & Multiplayer
   Full collection (~391 mods) + Cheat Menu: Rebuild, no Steam client needed.
 #>
 $ErrorActionPreference = 'Stop'
@@ -17,7 +17,7 @@ $NL          = [Environment]::NewLine
 # Target game build. B43 = change these lines; the layout repair and [10] checks derive from them.
 $GameBuild = '42'      # major build: version folder name (42/)
 $GameBuildFull = '42.22'  # current full build: versionMax floor for [10] warnings
-$ScriptVersion = '479'    # app version: shown in the menu header + GUI title
+$ScriptVersion = '480'    # app version: shown in the menu header + GUI title
 
 # All known categories, including ones with zero mods right now (Maps /
 # Audio / Zombies have no catalog mods yet). The category editor lists
@@ -337,7 +337,7 @@ $Mods = @(
   @{ Name='Cheat Menu: Rebuild'; WorkshopId='3786332527'; Cat='Cheats' },
 
   # ---------- GRAPHICS ----------
-  @{ Name='6244 3D models for Viewpoint'; WorkshopId='3810302175'; Cat='Graphics' },
+  @{ Name='6282 3D models for Viewpoint'; WorkshopId='3810302175'; Cat='Graphics' },
 
   # ---------- NPCS (companions & encounters) ----------
   @{ Name='[B42.21] Knox Event Expanded NPC'; WorkshopId='3397396843'; Cat='NPCs' },
