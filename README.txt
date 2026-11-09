@@ -1,8 +1,8 @@
-PZ MOD MANAGER v478
+PZ MOD MANAGER v479
 Created by duy64. Licensed under the MIT License (see LICENSE.txt).
 
 WHAT IT IS
-  A PowerShell GUI mod manager for Project Zomboid Build 42.21. Add, install, and manage mods, packs, categories, and full mod-list profiles. No Steam client needed (uses SteamCMD).
+  A PowerShell GUI mod manager for Project Zomboid Build 42.22. Add, install, and manage mods, packs, categories, and full mod-list profiles. No Steam client needed (uses SteamCMD).
   No build or install step - it is a single PowerShell script (PZModManager.ps1). Just run Run-ModManager.bat.
 
 QUICK START

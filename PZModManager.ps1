@@ -1,7 +1,7 @@
 ﻿# PZ Mod Manager - Created by duy64. Licensed under the MIT License (see LICENSE.txt).
 #Requires -Version 5.1
 <#
-  PZ Mod Manager v478 - B42 Essentials: mod pack for Single-Player & Multiplayer
+  PZ Mod Manager v479 - B42 Essentials: mod pack for Single-Player & Multiplayer
   Full collection (~391 mods) + Cheat Menu: Rebuild, no Steam client needed.
 #>
 $ErrorActionPreference = 'Stop'
@@ -16,8 +16,8 @@ $NL          = [Environment]::NewLine
 
 # Target game build. B43 = change these lines; the layout repair and [10] checks derive from them.
 $GameBuild = '42'      # major build: version folder name (42/)
-$GameBuildFull = '42.21'  # current full build: versionMax floor for [10] warnings
-$ScriptVersion = '478'    # app version: shown in the menu header + GUI title
+$GameBuildFull = '42.22'  # current full build: versionMax floor for [10] warnings
+$ScriptVersion = '479'    # app version: shown in the menu header + GUI title
 
 # All known categories, including ones with zero mods right now (Maps /
 # Audio / Zombies have no catalog mods yet). The category editor lists
@@ -31,7 +31,7 @@ $script:GuiMode = $false  # $true while the WPF window is open: Pause is a no-op
 $script:WorkshopNameFailed = @{}  # Workshop IDs whose Steam title fetch failed (never re-fetch)
 
 function Get-BuildInfo([string]$text) {
-  # Parses "43", "43.1", "43.0.1", "v42.21" -> @{ Build='43'; Full='43.1'; Minor=1 }.
+  # Parses "43", "43.1", "43.0.1", "v42.22" -> @{ Build='43'; Full='43.1'; Minor=1 }.
   # Full is normalized to major.minor (the [10] check compares 2-part versionMax).
   # Returns $null when no version number is found.
   $t = $text.Trim() -replace '^[^\d]+', ''
@@ -2158,7 +2158,7 @@ function Test-PreInstallCompatible([string]$WorkshopId, [string]$Name, $keptDirs
     $mmin = [regex]::Match($raw, '(?m)^\s*versionMin\s*=\s*(.+?)\s*$'); if ($mmin.Success) { $vmin = $mmin.Groups[1].Value.Trim() }
     $mmax = [regex]::Match($raw, '(?m)^\s*versionMax\s*=\s*(.+?)\s*$'); if ($mmax.Success) { $vmax = $mmax.Groups[1].Value.Trim() }
     # Full-version compare (same as Test-ModVersionMatches): a
-    # decimal cap like versionMax=42.18.999 excludes B42.21.
+    # decimal cap like versionMax=42.18.999 excludes B42.22.
     $pvMax = ConvertTo-ModVersion $vmax
     $pvMin = ConvertTo-ModVersion $vmin
     $buildV = $null

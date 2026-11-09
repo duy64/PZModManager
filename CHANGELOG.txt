@@ -1,6 +1,8 @@
 PZ MOD MANAGER - FULL CHANGELOG
 Created by duy64. Licensed under the MIT License (see LICENSE.txt).
 
+v479: The target game build is now 42.22. Mods capped at versionMax=42.21 are flagged as too old by the version check, and mods declaring 42.22 match. No catalog changes (391 mods).
+
 v478: Removed [B42] ZombieBuddy Extensions from the catalog and the Default list (391 mods in the catalog, 390 in the list). Without the manual ZombieBuddy.jar swap it does nothing - subscribing alone never activates it, and the manager does not perform the swap - so it was dead weight in the list. The Frameworks Pack shrinks by one automatically (it covers its whole category).
 
 v477: The Aircrafts Pack now covers the whole Aircrafts category (CAT:Aircrafts) plus the Aviation Core framework, so the fifteen new aircraft join the pack automatically - previously the pack listed only the UH-1B Huey helicopter and Aviation Core by ID, so the new aircraft appeared under the Aircrafts category but not in the pack. The Frameworks Pack already covers its category, so the two new flight frameworks were already in it. No catalog changes (392 mods).
