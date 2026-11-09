@@ -1,6 +1,8 @@
 PZ MOD MANAGER - FULL CHANGELOG
 Created by duy64. Licensed under the MIT License (see LICENSE.txt).
 
+v481: Catalog names now apply to existing lists, so a renamed catalog mod shows its current name instead of the name stored in the list file. No other changes.
+
 v480: The catalog name for Workshop 3810302175 is updated to '6282 3D models for Viewpoint' to match its current Workshop title. No other changes.
 
 v479: The target game build is now 42.22. Mods capped at versionMax=42.21 are flagged as too old by the version check, and mods declaring 42.22 match. No catalog changes (391 mods).

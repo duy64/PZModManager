@@ -1,7 +1,7 @@
 ﻿# PZ Mod Manager - Created by duy64. Licensed under the MIT License (see LICENSE.txt).
 #Requires -Version 5.1
 <#
-  PZ Mod Manager v480 - B42 Essentials: mod pack for Single-Player & Multiplayer
+  PZ Mod Manager v481 - B42 Essentials: mod pack for Single-Player & Multiplayer
   Full collection (~391 mods) + Cheat Menu: Rebuild, no Steam client needed.
 #>
 $ErrorActionPreference = 'Stop'
@@ -17,7 +17,7 @@ $NL          = [Environment]::NewLine
 # Target game build. B43 = change these lines; the layout repair and [10] checks derive from them.
 $GameBuild = '42'      # major build: version folder name (42/)
 $GameBuildFull = '42.22'  # current full build: versionMax floor for [10] warnings
-$ScriptVersion = '480'    # app version: shown in the menu header + GUI title
+$ScriptVersion = '481'    # app version: shown in the menu header + GUI title
 
 # All known categories, including ones with zero mods right now (Maps /
 # Audio / Zombies have no catalog mods yet). The category editor lists
@@ -608,6 +608,8 @@ if ($badCount -gt 0) {
 # so the reset would not restore anything.
 $script:BuiltinCats = @{}
 foreach ($m in @($script:DefaultBase)) { $script:BuiltinCats[[string]$m.WorkshopId] = [string]$m.Cat }
+$script:BuiltinNames = @{}
+foreach ($m in @($script:DefaultBase)) { $script:BuiltinNames[[string]$m.WorkshopId] = [string]$m.Name }
 $script:CustomCategories = Get-CustomCategories
 Apply-CategoryOverrides $Mods
 Apply-CategoryOverrides $script:DefaultBase
@@ -877,13 +879,16 @@ function Set-ModsFromNamedList([string]$safe) {
     # PSCustomObject, NOT a hashtable: Sort-Object by property name
     # does not resolve hashtable keys in Windows PowerShell 5.1, so
     # the Mods tab sort silently did nothing (rows stayed in list order).
-    # The catalog (BuiltinCats) is the source of truth for catalog mods,
-    # so a catalog rearrangement applies to existing lists. The stored
-    # Cat is kept only for mods NOT in the catalog. Manual moves live in
+    # The catalog (BuiltinCats / BuiltinNames) is the source of truth
+    # for catalog mods, so a catalog rename or rearrangement applies
+    # to existing lists. The stored Name and Cat are kept only for
+    # mods NOT in the catalog. Manual moves live in
     # custom-categories.json and still win via Apply-CategoryOverrides.
     $cat = [string]$e.cat
     if ($script:BuiltinCats -and $script:BuiltinCats.ContainsKey([string]$e.workshopId)) { $cat = [string]$script:BuiltinCats[[string]$e.workshopId] }
-    $m += [PSCustomObject]@{ Name = [string]$e.name; WorkshopId = [string]$e.workshopId; Cat = $cat }
+    $nm = [string]$e.name
+    if ($script:BuiltinNames -and $script:BuiltinNames.ContainsKey([string]$e.workshopId)) { $nm = [string]$script:BuiltinNames[[string]$e.workshopId] }
+    $m += [PSCustomObject]@{ Name = $nm; WorkshopId = [string]$e.workshopId; Cat = $cat }
   }
   Apply-CategoryOverrides $m
   $script:Mods = $m
@@ -3686,7 +3691,12 @@ function Show-GuiAddFromListPicker([string]$packName) {
   $candidates = @()
   foreach ($m in @(Get-ListDirectMods (Get-ActiveListSafe))) {
     if (-not $inPack.ContainsKey([string]$m.WorkshopId)) {
-      $candidates += [PSCustomObject]@{ Name = [string]$m.Name; WorkshopId = [string]$m.WorkshopId; Cat = [string]$m.Cat }
+      # The catalog is the source of truth for the name, as in
+      # Set-ModsFromNamedList, so a renamed catalog mod shows its
+      # current name here instead of the name stored in the list file.
+      $candName = [string]$m.Name
+      if ($script:BuiltinNames -and $script:BuiltinNames.ContainsKey([string]$m.WorkshopId)) { $candName = [string]$script:BuiltinNames[[string]$m.WorkshopId] }
+      $candidates += [PSCustomObject]@{ Name = $candName; WorkshopId = [string]$m.WorkshopId; Cat = [string]$m.Cat }
     }
   }
   return Show-GuiModPicker ('Add from current list to ' + $packName + ' (' + $candidates.Count + ' mods not in this pack)') 'Select the mods to add to this pack:' $candidates
